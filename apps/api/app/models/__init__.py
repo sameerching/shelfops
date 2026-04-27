@@ -1,9 +1,13 @@
 from app.models.entities import (
     AvailabilitySnapshot,
     Brand,
+    DispatchRecord,
+    GRNRecord,
     ImportBatch,
     ImportRowError,
+    InventoryPosition,
     Location,
+    PORecord,
     SalesVelocity,
     SKU,
     UploadedFile,
@@ -20,4 +24,8 @@ __all__ = [
     "Location",
     "AvailabilitySnapshot",
     "SalesVelocity",
+    "InventoryPosition",
+    "PORecord",
+    "DispatchRecord",
+    "GRNRecord",
 ]

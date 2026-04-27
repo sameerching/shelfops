@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -22,6 +22,9 @@ class Brand(TimestampMixin, Base):
     availability_snapshots: Mapped[list["AvailabilitySnapshot"]] = relationship(back_populates="brand")
     sales_velocity_rows: Mapped[list["SalesVelocity"]] = relationship(back_populates="brand")
     inventory_positions: Mapped[list["InventoryPosition"]] = relationship(back_populates="brand")
+    po_records: Mapped[list["PORecord"]] = relationship(back_populates="brand")
+    dispatch_records: Mapped[list["DispatchRecord"]] = relationship(back_populates="brand")
+    grn_records: Mapped[list["GRNRecord"]] = relationship(back_populates="brand")
 
 
 class User(TimestampMixin, Base):
@@ -72,6 +75,9 @@ class SKU(TimestampMixin, Base):
     availability_snapshots: Mapped[list["AvailabilitySnapshot"]] = relationship(back_populates="sku")
     sales_velocity_rows: Mapped[list["SalesVelocity"]] = relationship(back_populates="sku")
     inventory_positions: Mapped[list["InventoryPosition"]] = relationship(back_populates="sku")
+    po_records: Mapped[list["PORecord"]] = relationship(back_populates="sku")
+    dispatch_records: Mapped[list["DispatchRecord"]] = relationship(back_populates="sku")
+    grn_records: Mapped[list["GRNRecord"]] = relationship(back_populates="sku")
 
 
 class ImportBatch(TimestampMixin, Base):
@@ -92,6 +98,9 @@ class ImportBatch(TimestampMixin, Base):
     availability_snapshots: Mapped[list["AvailabilitySnapshot"]] = relationship(back_populates="import_batch")
     sales_velocity_rows: Mapped[list["SalesVelocity"]] = relationship(back_populates="import_batch")
     inventory_positions: Mapped[list["InventoryPosition"]] = relationship(back_populates="import_batch")
+    po_records: Mapped[list["PORecord"]] = relationship(back_populates="import_batch")
+    dispatch_records: Mapped[list["DispatchRecord"]] = relationship(back_populates="import_batch")
+    grn_records: Mapped[list["GRNRecord"]] = relationship(back_populates="import_batch")
 
 
 class ImportRowError(Base):
@@ -204,3 +213,73 @@ class InventoryPosition(TimestampMixin, Base):
     brand: Mapped[Brand] = relationship(back_populates="inventory_positions")
     sku: Mapped[SKU] = relationship(back_populates="inventory_positions")
     import_batch: Mapped[ImportBatch] = relationship(back_populates="inventory_positions")
+
+
+class PORecord(TimestampMixin, Base):
+    __tablename__ = "po_records"
+    __table_args__ = (
+        UniqueConstraint("brand_id", "sku_id", "platform", "city", "po_number", name="uq_po_record_dedupe"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
+    sku_id: Mapped[int] = mapped_column(ForeignKey("skus.id", ondelete="CASCADE"), nullable=False, index=True)
+    platform: Mapped[str] = mapped_column(String(100), nullable=False)
+    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    po_number: Mapped[str] = mapped_column(String(100), nullable=False)
+    po_qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    po_status: Mapped[str] = mapped_column(String(100), nullable=False)
+    po_date: Mapped[date] = mapped_column(Date(), nullable=False, index=True)
+    import_batch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    brand: Mapped[Brand] = relationship(back_populates="po_records")
+    sku: Mapped[SKU] = relationship(back_populates="po_records")
+    import_batch: Mapped[ImportBatch] = relationship(back_populates="po_records")
+
+
+class DispatchRecord(TimestampMixin, Base):
+    __tablename__ = "dispatch_records"
+    __table_args__ = (
+        UniqueConstraint("brand_id", "sku_id", "platform", "city", "dispatch_date", name="uq_dispatch_record_dedupe"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
+    sku_id: Mapped[int] = mapped_column(ForeignKey("skus.id", ondelete="CASCADE"), nullable=False, index=True)
+    platform: Mapped[str] = mapped_column(String(100), nullable=False)
+    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    dispatch_qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    dispatch_status: Mapped[str] = mapped_column(String(100), nullable=False)
+    dispatch_date: Mapped[date] = mapped_column(Date(), nullable=False, index=True)
+    import_batch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    brand: Mapped[Brand] = relationship(back_populates="dispatch_records")
+    sku: Mapped[SKU] = relationship(back_populates="dispatch_records")
+    import_batch: Mapped[ImportBatch] = relationship(back_populates="dispatch_records")
+
+
+class GRNRecord(TimestampMixin, Base):
+    __tablename__ = "grn_records"
+    __table_args__ = (
+        UniqueConstraint("brand_id", "sku_id", "platform", "city", "grn_date", name="uq_grn_record_dedupe"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
+    sku_id: Mapped[int] = mapped_column(ForeignKey("skus.id", ondelete="CASCADE"), nullable=False, index=True)
+    platform: Mapped[str] = mapped_column(String(100), nullable=False)
+    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    grn_qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    grn_status: Mapped[str] = mapped_column(String(100), nullable=False)
+    grn_date: Mapped[date] = mapped_column(Date(), nullable=False, index=True)
+    import_batch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    brand: Mapped[Brand] = relationship(back_populates="grn_records")
+    sku: Mapped[SKU] = relationship(back_populates="grn_records")
+    import_batch: Mapped[ImportBatch] = relationship(back_populates="grn_records")
