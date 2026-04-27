@@ -6,53 +6,48 @@
 shelfops/
   AGENTS.md
   README.md
+  docker-compose.yml
   docs/
     PRD.md
     TASKS.md
     DATA_FORMATS.md
     ARCHITECTURE.md
-  backend/                 # FastAPI service (to be created)
-    app/
-      api/
-      core/
-      models/
-      schemas/
-      services/
-      repositories/
-      jobs/
-    alembic/
-    tests/
-  frontend/                # Next.js app (to be created)
-    src/
+  apps/
+    api/                    # FastAPI backend
       app/
-      components/
-      lib/
-      hooks/
-  infra/
-    docker/
-    compose/
+        api/
+        core/
+        models/
+      alembic/
+      tests/
+      pyproject.toml
+    web/                    # Next.js frontend
+      app/
+      package.json
+      tsconfig.json
+      tailwind.config.ts
 ```
 
 ## 2) Backend structure
-- `app/api/` → FastAPI routers grouped by domain:
+- `apps/api/app/api/` → FastAPI routers grouped by domain:
   - `imports`
   - `cases`
   - `diagnosis`
   - `actions`
   - `tracking`
   - `metrics`
-- `app/schemas/` → Pydantic v2 request/response + ingestion schemas.
-- `app/models/` → SQLAlchemy models.
-- `app/services/` → business logic (import parser, case engine, diagnosis engine).
-- `app/repositories/` → DB access boundaries.
-- `app/jobs/` → asynchronous/background processing.
-- `tests/` → pytest unit + integration tests.
+- `apps/api/app/schemas/` → Pydantic v2 request/response + ingestion schemas.
+- `apps/api/app/models/` → SQLAlchemy models.
+- `apps/api/app/services/` → business logic (import parser, case engine, diagnosis engine).
+- `apps/api/app/repositories/` → DB access boundaries.
+- `apps/api/app/jobs/` → asynchronous/background processing.
+- `apps/api/tests/` → pytest unit + integration tests.
 
 ## 3) Frontend structure
-- `src/app/` → Next.js routes/pages.
-- `src/components/` → reusable UI components (tables, filters, status chips).
-- `src/lib/` → API client + helpers.
-- `src/hooks/` → state and data-fetch hooks.
+- `apps/web/app/` → Next.js App Router pages/routes.
+- `apps/web/components/` → reusable UI components (tables, filters, status chips).
+- `apps/web/lib/` → API client + helpers.
+- `apps/web/hooks/` → state and data-fetch hooks.
 
 Planned key screens:
 1. Import center (upload + validation feedback)
