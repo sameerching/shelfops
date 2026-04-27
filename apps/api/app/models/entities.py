@@ -19,6 +19,7 @@ class Brand(TimestampMixin, Base):
     uploaded_files: Mapped[list["UploadedFile"]] = relationship(back_populates="brand")
     skus: Mapped[list["SKU"]] = relationship(back_populates="brand_rel")
     import_batches: Mapped[list["ImportBatch"]] = relationship(back_populates="brand")
+    availability_snapshots: Mapped[list["AvailabilitySnapshot"]] = relationship(back_populates="brand")
 
 
 class User(TimestampMixin, Base):
@@ -66,6 +67,7 @@ class SKU(TimestampMixin, Base):
     active_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
     brand_rel: Mapped[Brand] = relationship(back_populates="skus")
+    availability_snapshots: Mapped[list["AvailabilitySnapshot"]] = relationship(back_populates="sku")
 
 
 class ImportBatch(TimestampMixin, Base):
@@ -83,6 +85,7 @@ class ImportBatch(TimestampMixin, Base):
 
     brand: Mapped[Brand] = relationship(back_populates="import_batches")
     row_errors: Mapped[list["ImportRowError"]] = relationship(back_populates="import_batch", cascade="all, delete-orphan")
+    availability_snapshots: Mapped[list["AvailabilitySnapshot"]] = relationship(back_populates="import_batch")
 
 
 class ImportRowError(Base):
@@ -99,3 +102,43 @@ class ImportRowError(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     import_batch: Mapped[ImportBatch] = relationship(back_populates="row_errors")
+
+
+class Location(TimestampMixin, Base):
+    __tablename__ = "locations"
+    __table_args__ = (UniqueConstraint("platform", "city", "location", name="uq_locations_platform_city_location"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    platform: Mapped[str] = mapped_column(String(100), nullable=False)
+    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    location: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    availability_snapshots: Mapped[list["AvailabilitySnapshot"]] = relationship(back_populates="location_rel")
+
+
+class AvailabilitySnapshot(TimestampMixin, Base):
+    __tablename__ = "availability_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "brand_id",
+            "sku_id",
+            "location_id",
+            "timestamp",
+            name="uq_availability_snapshot_dedupe",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
+    sku_id: Mapped[int] = mapped_column(ForeignKey("skus.id", ondelete="CASCADE"), nullable=False, index=True)
+    location_id: Mapped[int] = mapped_column(ForeignKey("locations.id", ondelete="CASCADE"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    import_batch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    brand: Mapped[Brand] = relationship(back_populates="availability_snapshots")
+    sku: Mapped[SKU] = relationship(back_populates="availability_snapshots")
+    location_rel: Mapped[Location] = relationship(back_populates="availability_snapshots")
+    import_batch: Mapped[ImportBatch] = relationship(back_populates="availability_snapshots")
