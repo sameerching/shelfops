@@ -6,154 +6,137 @@ ShelfOps MVP starts from file uploads only. Each file can be CSV or XLSX.
 - Header row required.
 - Column names are case-insensitive but mapped to canonical names below.
 - Dates should be ISO (`YYYY-MM-DD`) where possible.
-- Currency fields should be numeric.
+- Currency and quantity fields should be numeric.
 - All timestamps are interpreted as UTC unless a timezone column is provided.
-- Primary dedupe key for ingested rows = report_type + source_file + natural_key fields.
+- Primary dedupe key for ingested rows = `report_type + source_file + natural_key fields`.
 
 ---
 
 ## 1) SKU master
-**Purpose:** Master dimension for SKU metadata.
+**Purpose:** Master dimension for SKU metadata used by the case and impact engines.
 
 ### Required columns
 - `sku_code` (string) — unique SKU identifier
 - `sku_name` (string)
-- `brand` (string)
 - `category` (string)
-- `mrp` (number)
-- `list_price` (number)
-- `uom` (string)
-- `active_flag` (boolean)
+- `selling_price` (number)
+- `contribution_margin` (number)
+- `case_pack` (number)
 
 ### Optional columns
-- `subcategory` (string)
-- `launch_date` (date)
-- `discontinue_date` (date)
+- `brand` (string)
+- `mrp` (number)
+- `is_hero_sku` (boolean)
+- `active_flag` (boolean)
 
 ---
 
 ## 2) Availability report
-**Purpose:** Detect stockouts by SKU/location/platform/time.
+**Purpose:** Detect stockouts by SKU/platform/city/location over time.
 
 ### Required columns
-- `report_date` (date)
+- `sku_code` (string)
 - `platform` (string)
 - `city` (string)
-- `store_id` (string)
-- `sku_code` (string)
-- `availability_status` (string: `in_stock` / `out_of_stock`)
-- `snapshot_time` (datetime)
+- `location` (string)
+- `status` (string: `in_stock` / `out_of_stock`)
+- `timestamp` (datetime)
 
 ### Optional columns
-- `listing_status` (string)
-- `buy_box_status` (string)
+- none in Phase 1
 
 ---
 
 ## 3) Sales velocity
-**Purpose:** Estimate lost revenue during stockout periods.
+**Purpose:** Provide expected demand baseline for lost revenue estimation.
 
 ### Required columns
-- `date` (date)
+- `sku_code` (string)
 - `platform` (string)
 - `city` (string)
-- `sku_code` (string)
-- `units_sold` (number)
-- `net_revenue` (number)
+- `avg_units_per_day` (number)
 
 ### Optional columns
-- `promo_flag` (boolean)
-- `discount_amount` (number)
+- none in Phase 1
 
 ---
 
 ## 4) Inventory report
-**Purpose:** Understand on-hand and available inventory by node.
+**Purpose:** Assess inventory availability by warehouse and city.
 
 ### Required columns
-- `report_date` (date)
-- `node_type` (string: `warehouse` / `dark_store`)
-- `node_id` (string)
 - `sku_code` (string)
-- `on_hand_qty` (number)
+- `warehouse` (string)
+- `city` (string)
 - `available_qty` (number)
-- `reserved_qty` (number)
+- `timestamp` (datetime)
 
 ### Optional columns
-- `in_transit_qty` (number)
-- `safety_stock_qty` (number)
+- none in Phase 1
 
 ---
 
 ## 5) PO tracker
-**Purpose:** Diagnose supply gaps due to purchase order delays or shortages.
+**Purpose:** Diagnose supply-side gaps from purchase order status.
 
 ### Required columns
-- `po_number` (string)
-- `po_date` (date)
-- `supplier_name` (string)
 - `sku_code` (string)
-- `ordered_qty` (number)
-- `expected_dispatch_date` (date)
-- `expected_grn_date` (date)
+- `platform` (string)
+- `city` (string)
+- `po_number` (string)
+- `po_qty` (number)
 - `po_status` (string)
+- `po_date` (date)
 
 ### Optional columns
-- `received_qty` (number)
-- `po_line_value` (number)
+- none in Phase 1
 
 ---
 
 ## 6) Dispatch tracker
-**Purpose:** Track fulfillment dispatch execution against POs/transfers.
+**Purpose:** Track dispatch execution against planned replenishment.
 
 ### Required columns
-- `dispatch_id` (string)
-- `dispatch_date` (date)
-- `source_node_id` (string)
-- `destination_node_id` (string)
 - `sku_code` (string)
+- `platform` (string)
+- `city` (string)
 - `dispatch_qty` (number)
 - `dispatch_status` (string)
+- `dispatch_date` (date)
 
 ### Optional columns
-- `eta_date` (date)
-- `transporter_name` (string)
+- none in Phase 1
 
 ---
 
 ## 7) GRN tracker
-**Purpose:** Confirm goods receipt and inward completion.
+**Purpose:** Confirm goods receipt completion and inward timing.
 
 ### Required columns
-- `grn_number` (string)
-- `grn_date` (date)
-- `node_id` (string)
 - `sku_code` (string)
-- `received_qty` (number)
+- `platform` (string)
+- `city` (string)
+- `grn_qty` (number)
 - `grn_status` (string)
+- `grn_date` (date)
 
 ### Optional columns
-- `po_number` (string)
-- `short_qty` (number)
-- `damage_qty` (number)
+- none in Phase 1
 
 ---
 
 ## 8) Owner mapping
-**Purpose:** Map platform/city/category combinations to case owners.
+**Purpose:** Map platform and city to operational owners.
 
 ### Required columns
-- `owner_id` (string)
-- `owner_name` (string)
-- `owner_email` (string)
 - `platform` (string)
 - `city` (string)
-- `category` (string)
+- `owner_name` (string)
+- `owner_email` (string)
+- `role` (string)
 
 ### Optional columns
-- `backup_owner_email` (string)
-- `sla_hours` (number)
+- none in Phase 1
 
 ---
 
@@ -162,7 +145,7 @@ ShelfOps MVP starts from file uploads only. Each file can be CSV or XLSX.
 - Soft fail row if datatype coercion fails; keep rest of batch.
 - Store row-level errors with `row_number`, `column_name`, `error_code`, `error_message`.
 - Provide import summary metrics:
-  - total_rows
-  - accepted_rows
-  - rejected_rows
-  - duplicate_rows
+  - `total_rows`
+  - `accepted_rows`
+  - `rejected_rows`
+  - `duplicate_rows`
