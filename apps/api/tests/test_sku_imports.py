@@ -65,6 +65,22 @@ def test_valid_csv_upload_creates_skus() -> None:
     assert len(list_response.json()) == 2
 
 
+def test_upload_returns_400_when_brand_missing() -> None:
+    csv_data = (
+        "sku_code,sku_name,category,selling_price,contribution_margin,case_pack\n"
+        "SKU-1,Item 1,Snacks,10.5,0.22,6\n"
+    )
+
+    response = client.post(
+        "/imports/sku-master",
+        files={"file": ("sku_master.csv", csv_data, "text/csv")},
+        data={"brand_id": "9999"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Brand 9999 does not exist. Create the brand before importing SKUs."
+
+
 def test_missing_required_column_hard_fails_batch() -> None:
     seed_brand(2)
     csv_data = (

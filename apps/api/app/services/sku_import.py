@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.entities import ImportBatch, ImportRowError, SKU
+from app.models.entities import Brand, ImportBatch, ImportRowError, SKU
 from app.schemas.imports import ImportSummaryResponse, RowErrorSchema
 
 REQUIRED_COLUMNS = {
@@ -78,6 +78,13 @@ def _optional_text(value: object) -> str | None:
 
 
 def import_sku_master(db: Session, brand_id: int, file_name: str, content: bytes) -> ImportSummaryResponse:
+    brand = db.get(Brand, brand_id)
+    if brand is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Brand {brand_id} does not exist. Create the brand before importing SKUs.",
+        )
+
     batch = ImportBatch(brand_id=brand_id, file_type="sku_master", file_name=file_name, status="processing")
     db.add(batch)
     db.flush()
