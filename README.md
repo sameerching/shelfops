@@ -34,13 +34,16 @@ docker compose up -d postgres redis
 ```bash
 cd apps/api
 uv sync --group dev
+uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
-Health endpoint:
+Health endpoints:
 
 ```bash
 curl http://127.0.0.1:8000/health
+# {"status":"ok"}
+curl http://127.0.0.1:8000/health/db
 # {"status":"ok"}
 ```
 
