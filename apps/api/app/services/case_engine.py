@@ -148,7 +148,7 @@ def generate_stockout_cases(db: Session, brand_id: int) -> tuple[int, int, int, 
 
         for first_oos, last_oos, recovered_at in incidents:
             case = case_by_detected.get(first_oos)
-            if case is None and len(active_unmatched_cases) == 1:
+            if case is None and recovered_at is None and len(active_unmatched_cases) == 1:
                 # Backfilled out_of_stock snapshots can shift incident start earlier than the currently open case.
                 # In that situation, update the existing open case instead of creating a duplicate.
                 case = active_unmatched_cases[0]
