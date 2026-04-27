@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.availability import router as availability_router
 from app.api.health import router as health_router
 from app.api.imports import router as imports_router
+from app.api.inventory import router as inventory_router
 from app.api.sales_velocity import router as sales_velocity_router
 from app.api.skus import router as skus_router
 
@@ -23,3 +24,4 @@ app.include_router(imports_router)
 app.include_router(skus_router)
 app.include_router(availability_router)
 app.include_router(sales_velocity_router)
+app.include_router(inventory_router)
