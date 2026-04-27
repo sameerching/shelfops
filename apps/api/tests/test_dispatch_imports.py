@@ -146,6 +146,18 @@ def test_invalid_dispatch_qty_creates_row_level_error() -> None:
     assert payload["errors"][0]["error_code"] == "invalid_numeric"
 
 
+def test_nan_dispatch_qty_creates_row_level_error() -> None:
+    seed_brand(751)
+    seed_skus(751, ["SKU-1"])
+
+    response = upload_dispatch(751, "sku_code,platform,city,dispatch_qty,dispatch_status,dispatch_date\nSKU-1,Blinkit,Mumbai,NaN,open,2026-04-01\n")
+
+    payload = response.json()
+    assert payload["accepted_rows"] == 0
+    assert payload["rejected_rows"] == 1
+    assert payload["errors"][0]["error_code"] == "invalid_numeric"
+
+
 def test_negative_dispatch_qty_creates_row_level_error() -> None:
     seed_brand(75)
     seed_skus(75, ["SKU-1"])

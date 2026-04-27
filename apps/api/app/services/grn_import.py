@@ -50,6 +50,8 @@ def _parse_qty(value: object) -> Decimal:
         parsed = Decimal(str(value).strip())
     except (InvalidOperation, TypeError, ValueError) as exc:
         raise ValueError("Invalid numeric value for grn_qty") from exc
+    if not parsed.is_finite():
+        raise ValueError("Invalid numeric value for grn_qty")
     if parsed < 0:
         raise ValueError("grn_qty cannot be negative")
     return parsed

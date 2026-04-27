@@ -146,6 +146,18 @@ def test_invalid_grn_qty_creates_row_level_error() -> None:
     assert payload["errors"][0]["error_code"] == "invalid_numeric"
 
 
+def test_nan_grn_qty_creates_row_level_error() -> None:
+    seed_brand(851)
+    seed_skus(851, ["SKU-1"])
+
+    response = upload_grn(851, "sku_code,platform,city,grn_qty,grn_status,grn_date\nSKU-1,Blinkit,Mumbai,NaN,received,2026-04-01\n")
+
+    payload = response.json()
+    assert payload["accepted_rows"] == 0
+    assert payload["rejected_rows"] == 1
+    assert payload["errors"][0]["error_code"] == "invalid_numeric"
+
+
 def test_negative_grn_qty_creates_row_level_error() -> None:
     seed_brand(85)
     seed_skus(85, ["SKU-1"])
