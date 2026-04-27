@@ -182,6 +182,18 @@ def test_invalid_grn_date_creates_row_level_error() -> None:
     assert payload["errors"][0]["error_code"] == "invalid_date"
 
 
+def test_numeric_grn_date_creates_row_level_error() -> None:
+    seed_brand(861)
+    seed_skus(861, ["SKU-1"])
+
+    response = upload_grn(861, "sku_code,platform,city,grn_qty,grn_status,grn_date\nSKU-1,Blinkit,Mumbai,1,received,45200\n")
+
+    payload = response.json()
+    assert payload["accepted_rows"] == 0
+    assert payload["rejected_rows"] == 1
+    assert payload["errors"][0]["error_code"] == "invalid_date"
+
+
 def test_duplicate_grn_not_inserted_and_counted() -> None:
     seed_brand(87)
     seed_skus(87, ["SKU-1"])

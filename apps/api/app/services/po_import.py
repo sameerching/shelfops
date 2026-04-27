@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 
@@ -59,6 +60,12 @@ def _parse_qty(value: object) -> Decimal:
 
 def _parse_date(value: object):
     text = _required_text(value, "po_date")
+    if re.fullmatch(r"[+-]?\d+(\.\d+)?", text):
+        if re.fullmatch(r"\d{8}", text):
+            parsed_numeric = pd.to_datetime(text, format="%Y%m%d", utc=True, errors="coerce")
+            if not pd.isna(parsed_numeric):
+                return parsed_numeric.date()
+        raise ValueError("Invalid date value for po_date")
     parsed = pd.to_datetime(text, utc=True, errors="coerce")
     if pd.isna(parsed):
         raise ValueError("Invalid date value for po_date")

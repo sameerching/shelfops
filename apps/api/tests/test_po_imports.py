@@ -186,6 +186,18 @@ def test_invalid_po_date_creates_row_level_error() -> None:
     assert payload["errors"][0]["error_code"] == "invalid_date"
 
 
+def test_numeric_po_date_creates_row_level_error() -> None:
+    seed_brand(661)
+    seed_skus(661, ["SKU-1"])
+
+    response = upload_po(661, "sku_code,platform,city,po_number,po_qty,po_status,po_date\nSKU-1,Blinkit,Mumbai,PO-1,1,open,45200\n")
+
+    payload = response.json()
+    assert payload["accepted_rows"] == 0
+    assert payload["rejected_rows"] == 1
+    assert payload["errors"][0]["error_code"] == "invalid_date"
+
+
 def test_empty_po_number_or_status_create_row_level_error() -> None:
     seed_brand(69)
     seed_skus(69, ["SKU-1"])
