@@ -17,7 +17,7 @@ type SKU = {
   active_flag: boolean;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
 export default function SkusPage() {
   const [brandId, setBrandId] = useState("1");
