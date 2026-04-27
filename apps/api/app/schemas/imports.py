@@ -1,4 +1,5 @@
 from datetime import datetime
+from datetime import date
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
@@ -82,6 +83,55 @@ class InventoryPositionResponse(BaseModel):
     city: str
     available_qty: Decimal
     timestamp: datetime
+    import_batch_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PORecordResponse(BaseModel):
+    id: int
+    brand_id: int
+    sku_id: int
+    sku_code: str
+    sku_name: str
+    platform: str
+    city: str
+    po_number: str
+    po_qty: Decimal
+    po_status: str
+    po_date: date
+    import_batch_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class DispatchRecordResponse(BaseModel):
+    id: int
+    brand_id: int
+    sku_id: int
+    sku_code: str
+    sku_name: str
+    platform: str
+    city: str
+    dispatch_qty: Decimal
+    dispatch_status: str
+    dispatch_date: date
+    import_batch_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class GRNRecordResponse(BaseModel):
+    id: int
+    brand_id: int
+    sku_id: int
+    sku_code: str
+    sku_name: str
+    platform: str
+    city: str
+    grn_qty: Decimal
+    grn_status: str
+    grn_date: date
     import_batch_id: int | None
     created_at: datetime
     updated_at: datetime
