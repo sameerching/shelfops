@@ -9,44 +9,66 @@ It converts uploaded operational data into recovery actions:
 ShelfOps does **not** begin with digital shelf scraping.
 MVP starts strictly from uploaded CSV/XLSX reports.
 
-## Tech stack (planned)
-- Frontend: Next.js + TypeScript + Tailwind
-- Backend: FastAPI + Python
-- Database: PostgreSQL
-- ORM: SQLAlchemy 2.0
-- Migrations: Alembic
-- Validation: Pydantic v2
-- File parsing: pandas + openpyxl
-- Local infra: Docker Compose (PostgreSQL + Redis)
+## Repository structure
 
-## Project status
-This repository currently contains **planning and documentation only**.
-No frontend or backend application code has been scaffolded yet.
+```text
+apps/
+  web/    # Next.js + TypeScript + Tailwind
+  api/    # FastAPI + uv + pytest
+docs/
+AGENTS.md
+docker-compose.yml
+README.md
+```
 
-Available docs:
-- `AGENTS.md` — engineering and delivery rules for future tasks
-- `docs/PRD.md` — product requirements
-- `docs/TASKS.md` — phased implementation plan
-- `docs/DATA_FORMATS.md` — CSV/XLSX data contracts
-- `docs/ARCHITECTURE.md` — planned system architecture
+## Local setup
 
-## Local run instructions (when implementation starts)
-Planned commands for future setup:
+### 1) Start infrastructure
 
 ```bash
-# Start local services
 docker compose up -d postgres redis
+```
 
-# Backend (planned)
-uvicorn app.main:app --reload
-pytest -q
-alembic upgrade head
+### 2) Run backend API
 
-# Frontend (planned)
+```bash
+cd apps/api
+uv sync --group dev
+uv run uvicorn app.main:app --reload
+```
+
+Health endpoint:
+
+```bash
+curl http://127.0.0.1:8000/health
+# {"status":"ok"}
+```
+
+### 3) Run backend tests
+
+```bash
+cd apps/api
+uv run pytest -q
+```
+
+### 4) Run frontend web app
+
+```bash
+cd apps/web
+npm install
 npm run dev
+```
+
+### 5) Build/type-check frontend
+
+```bash
+cd apps/web
+npm run build
+npm run typecheck
 ```
 
 ## MVP scope guardrails
 - No scraping in MVP
 - No AI integration in v1
 - No authentication in the first prototype unless explicitly requested
+- No product feature implementation in Phase 0 beyond repository foundation

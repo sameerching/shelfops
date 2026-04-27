@@ -1,0 +1,30 @@
+# OS/editor
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node/Next
+node_modules/
+.next/
+out/
+
+# Env/config
+.env
+.env.*
+!.env.example
+
+# Coverage/build artifacts
+coverage/
+htmlcov/
+dist/
+build/
