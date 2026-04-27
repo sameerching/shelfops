@@ -28,12 +28,18 @@ FALSE_VALUES = {"0", "false", "f", "no", "n"}
 
 def parse_sku_file(filename: str, data: bytes) -> pd.DataFrame:
     lowered = filename.lower()
-    if lowered.endswith(".csv"):
-        df = pd.read_csv(BytesIO(data), dtype=str)
-    elif lowered.endswith(".xlsx"):
-        df = pd.read_excel(BytesIO(data), engine="openpyxl", dtype=str)
-    else:
+    if not (lowered.endswith(".csv") or lowered.endswith(".xlsx")):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only CSV and XLSX are supported")
+    try:
+        if lowered.endswith(".csv"):
+            df = pd.read_csv(BytesIO(data), dtype=str)
+        else:
+            df = pd.read_excel(BytesIO(data), engine="openpyxl", dtype=str)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not parse uploaded file. Please upload a valid CSV or XLSX file.",
+        ) from exc
 
     df.columns = [str(c).strip().lower() for c in df.columns]
     return df
@@ -48,7 +54,7 @@ def _to_decimal(value: object, column_name: str) -> Decimal:
         raise ValueError(f"Invalid numeric value for {column_name}") from exc
 
 
-def _to_bool(value: object, default: bool) -> bool:
+def _to_bool(value: object, column_name: str, default: bool) -> bool:
     if value is None or pd.isna(value):
         return default
     if isinstance(value, bool):
@@ -58,7 +64,7 @@ def _to_bool(value: object, default: bool) -> bool:
         return True
     if text in FALSE_VALUES:
         return False
-    raise ValueError("Invalid boolean value")
+    raise ValueError(f"Invalid boolean value for {column_name}")
 
 
 def _required_text(value: object, column_name: str) -> str:
@@ -143,8 +149,8 @@ def import_sku_master(db: Session, brand_id: int, file_name: str, content: bytes
             contribution_margin = _to_decimal(row.get("contribution_margin"), "contribution_margin")
             case_pack = _to_decimal(row.get("case_pack"), "case_pack")
             brand = _optional_text(row.get("brand")) if "brand" in df.columns else None
-            is_hero_sku = _to_bool(row.get("is_hero_sku"), default=False)
-            active_flag = _to_bool(row.get("active_flag"), default=True)
+            is_hero_sku = _to_bool(row.get("is_hero_sku"), column_name="is_hero_sku", default=False)
+            active_flag = _to_bool(row.get("active_flag"), column_name="active_flag", default=True)
 
             mrp_value = row.get("mrp")
             mrp = None

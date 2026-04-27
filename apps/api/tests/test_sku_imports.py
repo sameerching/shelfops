@@ -220,6 +220,7 @@ def test_invalid_boolean_does_not_mutate_existing_duplicate() -> None:
     update_payload = update_response.json()
     assert update_payload["accepted_rows"] == 0
     assert update_payload["rejected_rows"] == 1
+    assert update_payload["errors"][0]["column_name"] == "is_hero_sku"
 
     list_response = client.get("/skus", params={"brand_id": 8})
     assert list_response.status_code == 200
@@ -228,6 +229,20 @@ def test_invalid_boolean_does_not_mutate_existing_duplicate() -> None:
     assert rows[0]["sku_name"] == "Original Name"
     assert rows[0]["selling_price"] == "10"
     assert rows[0]["is_hero_sku"] is False
+
+
+def test_malformed_csv_returns_400_with_parse_message() -> None:
+    seed_brand(9)
+    malformed_csv_bytes = b"sku_code,sku_name,category\nSKU-1,\xff,\x00"
+
+    response = client.post(
+        "/imports/sku-master",
+        files={"file": ("sku_master.csv", malformed_csv_bytes, "text/csv")},
+        data={"brand_id": "9"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Could not parse uploaded file. Please upload a valid CSV or XLSX file."
 
 
 def test_get_skus_returns_uploaded_skus() -> None:
