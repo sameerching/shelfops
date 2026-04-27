@@ -50,6 +50,8 @@ def _parse_qty(value: object) -> Decimal:
         parsed = Decimal(str(value).strip())
     except (InvalidOperation, TypeError, ValueError) as exc:
         raise ValueError("Invalid numeric value for po_qty") from exc
+    if not parsed.is_finite():
+        raise ValueError("Invalid numeric value for po_qty")
     if parsed < 0:
         raise ValueError("po_qty cannot be negative")
     return parsed
@@ -118,7 +120,7 @@ def import_po_report(db: Session, brand_id: int, file_name: str, content: bytes)
     duplicate_rows = 0
 
     sku_cache: dict[str, SKU | None] = {}
-    dedupe_cache: set[tuple[int, str, str, str]] = set()
+    dedupe_cache: set[tuple[int, str, str, str, str]] = set()
 
     for row_idx, row in df.iterrows():
         row_number = int(row_idx) + 2
@@ -138,22 +140,20 @@ def import_po_report(db: Session, brand_id: int, file_name: str, content: bytes)
             if sku is None:
                 raise ValueError("Unknown sku_code for brand")
 
-            dedupe_key = (sku.id, platform, city, po_number)
+            dedupe_key = (sku.id, platform, city, po_number, file_name)
             if dedupe_key in dedupe_cache:
                 duplicate_rows += 1
                 continue
 
             existing = db.scalar(
                 select(PORecord)
-                .join(ImportBatch, PORecord.import_batch_id == ImportBatch.id)
                 .where(
                     PORecord.brand_id == brand_id,
                     PORecord.sku_id == sku.id,
                     PORecord.platform == platform,
                     PORecord.city == city,
                     PORecord.po_number == po_number,
-                    ImportBatch.file_type == "po_tracker",
-                    ImportBatch.file_name == file_name,
+                    PORecord.source_file == file_name,
                 )
             )
             if existing is not None:
@@ -171,6 +171,7 @@ def import_po_report(db: Session, brand_id: int, file_name: str, content: bytes)
                     po_qty=po_qty,
                     po_status=po_status,
                     po_date=po_date,
+                    source_file=file_name,
                     import_batch_id=batch.id,
                 )
             )

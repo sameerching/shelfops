@@ -159,6 +159,21 @@ def test_negative_po_qty_creates_row_level_error() -> None:
     assert payload["errors"][0]["error_code"] == "negative_value"
 
 
+def test_nan_po_qty_creates_row_level_error() -> None:
+    seed_brand(651)
+    seed_skus(651, ["SKU-1"])
+
+    response = upload_po(
+        651,
+        "sku_code,platform,city,po_number,po_qty,po_status,po_date\nSKU-1,Blinkit,Mumbai,PO-1,NaN,open,2026-04-01\n",
+    )
+
+    payload = response.json()
+    assert payload["accepted_rows"] == 0
+    assert payload["rejected_rows"] == 1
+    assert payload["errors"][0]["error_code"] == "invalid_numeric"
+
+
 def test_invalid_po_date_creates_row_level_error() -> None:
     seed_brand(66)
     seed_skus(66, ["SKU-1"])

@@ -118,7 +118,7 @@ def import_grn_report(db: Session, brand_id: int, file_name: str, content: bytes
     duplicate_rows = 0
 
     sku_cache: dict[str, SKU | None] = {}
-    dedupe_cache: set[tuple[int, str, str, object]] = set()
+    dedupe_cache: set[tuple[int, str, str, object, str]] = set()
 
     for row_idx, row in df.iterrows():
         row_number = int(row_idx) + 2
@@ -137,22 +137,20 @@ def import_grn_report(db: Session, brand_id: int, file_name: str, content: bytes
             if sku is None:
                 raise ValueError("Unknown sku_code for brand")
 
-            dedupe_key = (sku.id, platform, city, grn_date)
+            dedupe_key = (sku.id, platform, city, grn_date, file_name)
             if dedupe_key in dedupe_cache:
                 duplicate_rows += 1
                 continue
 
             existing = db.scalar(
                 select(GRNRecord)
-                .join(ImportBatch, GRNRecord.import_batch_id == ImportBatch.id)
                 .where(
                     GRNRecord.brand_id == brand_id,
                     GRNRecord.sku_id == sku.id,
                     GRNRecord.platform == platform,
                     GRNRecord.city == city,
                     GRNRecord.grn_date == grn_date,
-                    ImportBatch.file_type == "grn_tracker",
-                    ImportBatch.file_name == file_name,
+                    GRNRecord.source_file == file_name,
                 )
             )
             if existing is not None:
@@ -169,6 +167,7 @@ def import_grn_report(db: Session, brand_id: int, file_name: str, content: bytes
                     grn_qty=grn_qty,
                     grn_status=grn_status,
                     grn_date=grn_date,
+                    source_file=file_name,
                     import_batch_id=batch.id,
                 )
             )

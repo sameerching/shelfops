@@ -118,7 +118,7 @@ def import_dispatch_report(db: Session, brand_id: int, file_name: str, content: 
     duplicate_rows = 0
 
     sku_cache: dict[str, SKU | None] = {}
-    dedupe_cache: set[tuple[int, str, str, object]] = set()
+    dedupe_cache: set[tuple[int, str, str, object, str]] = set()
 
     for row_idx, row in df.iterrows():
         row_number = int(row_idx) + 2
@@ -137,22 +137,20 @@ def import_dispatch_report(db: Session, brand_id: int, file_name: str, content: 
             if sku is None:
                 raise ValueError("Unknown sku_code for brand")
 
-            dedupe_key = (sku.id, platform, city, dispatch_date)
+            dedupe_key = (sku.id, platform, city, dispatch_date, file_name)
             if dedupe_key in dedupe_cache:
                 duplicate_rows += 1
                 continue
 
             existing = db.scalar(
                 select(DispatchRecord)
-                .join(ImportBatch, DispatchRecord.import_batch_id == ImportBatch.id)
                 .where(
                     DispatchRecord.brand_id == brand_id,
                     DispatchRecord.sku_id == sku.id,
                     DispatchRecord.platform == platform,
                     DispatchRecord.city == city,
                     DispatchRecord.dispatch_date == dispatch_date,
-                    ImportBatch.file_type == "dispatch_tracker",
-                    ImportBatch.file_name == file_name,
+                    DispatchRecord.source_file == file_name,
                 )
             )
             if existing is not None:
@@ -169,6 +167,7 @@ def import_dispatch_report(db: Session, brand_id: int, file_name: str, content: 
                     dispatch_qty=dispatch_qty,
                     dispatch_status=dispatch_status,
                     dispatch_date=dispatch_date,
+                    source_file=file_name,
                     import_batch_id=batch.id,
                 )
             )

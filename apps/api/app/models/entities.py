@@ -218,7 +218,7 @@ class InventoryPosition(TimestampMixin, Base):
 class PORecord(TimestampMixin, Base):
     __tablename__ = "po_records"
     __table_args__ = (
-        UniqueConstraint("brand_id", "sku_id", "platform", "city", "po_number", "import_batch_id", name="uq_po_record_dedupe"),
+        UniqueConstraint("brand_id", "sku_id", "platform", "city", "po_number", "source_file", name="uq_po_record_dedupe"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -230,6 +230,7 @@ class PORecord(TimestampMixin, Base):
     po_qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     po_status: Mapped[str] = mapped_column(String(100), nullable=False)
     po_date: Mapped[date] = mapped_column(Date(), nullable=False, index=True)
+    source_file: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     import_batch_id: Mapped[int | None] = mapped_column(
         ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -242,7 +243,7 @@ class PORecord(TimestampMixin, Base):
 class DispatchRecord(TimestampMixin, Base):
     __tablename__ = "dispatch_records"
     __table_args__ = (
-        UniqueConstraint("brand_id", "sku_id", "platform", "city", "dispatch_date", "import_batch_id", name="uq_dispatch_record_dedupe"),
+        UniqueConstraint("brand_id", "sku_id", "platform", "city", "dispatch_date", "source_file", name="uq_dispatch_record_dedupe"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -253,6 +254,7 @@ class DispatchRecord(TimestampMixin, Base):
     dispatch_qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     dispatch_status: Mapped[str] = mapped_column(String(100), nullable=False)
     dispatch_date: Mapped[date] = mapped_column(Date(), nullable=False, index=True)
+    source_file: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     import_batch_id: Mapped[int | None] = mapped_column(
         ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -265,7 +267,7 @@ class DispatchRecord(TimestampMixin, Base):
 class GRNRecord(TimestampMixin, Base):
     __tablename__ = "grn_records"
     __table_args__ = (
-        UniqueConstraint("brand_id", "sku_id", "platform", "city", "grn_date", "import_batch_id", name="uq_grn_record_dedupe"),
+        UniqueConstraint("brand_id", "sku_id", "platform", "city", "grn_date", "source_file", name="uq_grn_record_dedupe"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -276,6 +278,7 @@ class GRNRecord(TimestampMixin, Base):
     grn_qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     grn_status: Mapped[str] = mapped_column(String(100), nullable=False)
     grn_date: Mapped[date] = mapped_column(Date(), nullable=False, index=True)
+    source_file: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     import_batch_id: Mapped[int | None] = mapped_column(
         ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True, index=True
     )
