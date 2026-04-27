@@ -57,10 +57,10 @@ def seed_skus(brand_id: int, sku_codes: list[str]) -> None:
         db.commit()
 
 
-def upload_dispatch(brand_id: int, csv_data: str):
+def upload_dispatch(brand_id: int, csv_data: str, filename: str = "dispatch.csv"):
     return client.post(
         "/imports/dispatch",
-        files={"file": ("dispatch.csv", csv_data, "text/csv")},
+        files={"file": (filename, csv_data, "text/csv")},
         data={"brand_id": str(brand_id)},
     )
 
@@ -190,6 +190,28 @@ def test_duplicate_dispatch_not_inserted_and_counted() -> None:
     with TestingSessionLocal() as db:
         count = db.query(DispatchRecord).filter(DispatchRecord.brand_id == 77).count()
         assert count == 1
+
+
+def test_duplicate_dispatch_scoped_to_source_file() -> None:
+    seed_brand(779)
+    seed_skus(779, ["SKU-1"])
+
+    csv_data = (
+        "sku_code,platform,city,dispatch_qty,dispatch_status,dispatch_date\n"
+        "SKU-1,Blinkit,Mumbai,1,open,2026-04-01\n"
+    )
+    first = upload_dispatch(779, csv_data, filename="dispatch_a.csv")
+    second = upload_dispatch(779, csv_data, filename="dispatch_b.csv")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["accepted_rows"] == 1
+    assert second.json()["accepted_rows"] == 1
+    assert second.json()["duplicate_rows"] == 0
+
+    with TestingSessionLocal() as db:
+        count = db.query(DispatchRecord).filter(DispatchRecord.brand_id == 779).count()
+        assert count == 2
 
 
 def test_get_dispatch_records_returns_rows_and_supports_filters() -> None:

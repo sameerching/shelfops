@@ -37,7 +37,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["import_batch_id"], ["import_batches.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["sku_id"], ["skus.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("brand_id", "sku_id", "platform", "city", "po_number", name="uq_po_record_dedupe"),
+        sa.UniqueConstraint("brand_id", "sku_id", "platform", "city", "po_number", "import_batch_id", name="uq_po_record_dedupe"),
     )
     op.create_index(op.f("ix_po_records_id"), "po_records", ["id"], unique=False)
     op.create_index(op.f("ix_po_records_brand_id"), "po_records", ["brand_id"], unique=False)
@@ -63,7 +63,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["sku_id"], ["skus.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "brand_id", "sku_id", "platform", "city", "dispatch_date", name="uq_dispatch_record_dedupe"
+            "brand_id", "sku_id", "platform", "city", "dispatch_date", "import_batch_id", name="uq_dispatch_record_dedupe"
         ),
     )
     op.create_index(op.f("ix_dispatch_records_id"), "dispatch_records", ["id"], unique=False)
@@ -94,7 +94,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["import_batch_id"], ["import_batches.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["sku_id"], ["skus.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("brand_id", "sku_id", "platform", "city", "grn_date", name="uq_grn_record_dedupe"),
+        sa.UniqueConstraint("brand_id", "sku_id", "platform", "city", "grn_date", "import_batch_id", name="uq_grn_record_dedupe"),
     )
     op.create_index(op.f("ix_grn_records_id"), "grn_records", ["id"], unique=False)
     op.create_index(op.f("ix_grn_records_brand_id"), "grn_records", ["brand_id"], unique=False)

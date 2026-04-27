@@ -143,12 +143,16 @@ def import_dispatch_report(db: Session, brand_id: int, file_name: str, content: 
                 continue
 
             existing = db.scalar(
-                select(DispatchRecord).where(
+                select(DispatchRecord)
+                .join(ImportBatch, DispatchRecord.import_batch_id == ImportBatch.id)
+                .where(
                     DispatchRecord.brand_id == brand_id,
                     DispatchRecord.sku_id == sku.id,
                     DispatchRecord.platform == platform,
                     DispatchRecord.city == city,
                     DispatchRecord.dispatch_date == dispatch_date,
+                    ImportBatch.file_type == "dispatch_tracker",
+                    ImportBatch.file_name == file_name,
                 )
             )
             if existing is not None:

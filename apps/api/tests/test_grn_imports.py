@@ -57,10 +57,10 @@ def seed_skus(brand_id: int, sku_codes: list[str]) -> None:
         db.commit()
 
 
-def upload_grn(brand_id: int, csv_data: str):
+def upload_grn(brand_id: int, csv_data: str, filename: str = "grn.csv"):
     return client.post(
         "/imports/grn",
-        files={"file": ("grn.csv", csv_data, "text/csv")},
+        files={"file": (filename, csv_data, "text/csv")},
         data={"brand_id": str(brand_id)},
     )
 
@@ -190,6 +190,25 @@ def test_duplicate_grn_not_inserted_and_counted() -> None:
     with TestingSessionLocal() as db:
         count = db.query(GRNRecord).filter(GRNRecord.brand_id == 87).count()
         assert count == 1
+
+
+def test_duplicate_grn_scoped_to_source_file() -> None:
+    seed_brand(879)
+    seed_skus(879, ["SKU-1"])
+
+    csv_data = "sku_code,platform,city,grn_qty,grn_status,grn_date\nSKU-1,Blinkit,Mumbai,1,received,2026-04-01\n"
+    first = upload_grn(879, csv_data, filename="grn_a.csv")
+    second = upload_grn(879, csv_data, filename="grn_b.csv")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["accepted_rows"] == 1
+    assert second.json()["accepted_rows"] == 1
+    assert second.json()["duplicate_rows"] == 0
+
+    with TestingSessionLocal() as db:
+        count = db.query(GRNRecord).filter(GRNRecord.brand_id == 879).count()
+        assert count == 2
 
 
 def test_get_grn_records_returns_rows_and_supports_filters() -> None:

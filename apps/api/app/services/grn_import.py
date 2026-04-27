@@ -143,12 +143,16 @@ def import_grn_report(db: Session, brand_id: int, file_name: str, content: bytes
                 continue
 
             existing = db.scalar(
-                select(GRNRecord).where(
+                select(GRNRecord)
+                .join(ImportBatch, GRNRecord.import_batch_id == ImportBatch.id)
+                .where(
                     GRNRecord.brand_id == brand_id,
                     GRNRecord.sku_id == sku.id,
                     GRNRecord.platform == platform,
                     GRNRecord.city == city,
                     GRNRecord.grn_date == grn_date,
+                    ImportBatch.file_type == "grn_tracker",
+                    ImportBatch.file_name == file_name,
                 )
             )
             if existing is not None:

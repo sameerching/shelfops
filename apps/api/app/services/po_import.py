@@ -144,12 +144,16 @@ def import_po_report(db: Session, brand_id: int, file_name: str, content: bytes)
                 continue
 
             existing = db.scalar(
-                select(PORecord).where(
+                select(PORecord)
+                .join(ImportBatch, PORecord.import_batch_id == ImportBatch.id)
+                .where(
                     PORecord.brand_id == brand_id,
                     PORecord.sku_id == sku.id,
                     PORecord.platform == platform,
                     PORecord.city == city,
                     PORecord.po_number == po_number,
+                    ImportBatch.file_type == "po_tracker",
+                    ImportBatch.file_name == file_name,
                 )
             )
             if existing is not None:

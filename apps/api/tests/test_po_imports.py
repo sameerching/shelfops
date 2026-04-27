@@ -57,10 +57,10 @@ def seed_skus(brand_id: int, sku_codes: list[str]) -> None:
         db.commit()
 
 
-def upload_po(brand_id: int, csv_data: str):
+def upload_po(brand_id: int, csv_data: str, filename: str = "po.csv"):
     return client.post(
         "/imports/po",
-        files={"file": ("po.csv", csv_data, "text/csv")},
+        files={"file": (filename, csv_data, "text/csv")},
         data={"brand_id": str(brand_id)},
     )
 
@@ -210,6 +210,25 @@ def test_duplicate_po_not_inserted_and_counted() -> None:
     with TestingSessionLocal() as db:
         count = db.query(PORecord).filter(PORecord.brand_id == 67).count()
         assert count == 1
+
+
+def test_duplicate_po_scoped_to_source_file() -> None:
+    seed_brand(679)
+    seed_skus(679, ["SKU-1"])
+
+    csv_data = "sku_code,platform,city,po_number,po_qty,po_status,po_date\nSKU-1,Blinkit,Mumbai,PO-1,1,open,2026-04-01\n"
+    first = upload_po(679, csv_data, filename="po_a.csv")
+    second = upload_po(679, csv_data, filename="po_b.csv")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["accepted_rows"] == 1
+    assert second.json()["accepted_rows"] == 1
+    assert second.json()["duplicate_rows"] == 0
+
+    with TestingSessionLocal() as db:
+        count = db.query(PORecord).filter(PORecord.brand_id == 679).count()
+        assert count == 2
 
 
 def test_get_po_records_returns_rows_and_supports_filters() -> None:

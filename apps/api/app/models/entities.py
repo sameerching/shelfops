@@ -218,7 +218,7 @@ class InventoryPosition(TimestampMixin, Base):
 class PORecord(TimestampMixin, Base):
     __tablename__ = "po_records"
     __table_args__ = (
-        UniqueConstraint("brand_id", "sku_id", "platform", "city", "po_number", name="uq_po_record_dedupe"),
+        UniqueConstraint("brand_id", "sku_id", "platform", "city", "po_number", "import_batch_id", name="uq_po_record_dedupe"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -242,7 +242,7 @@ class PORecord(TimestampMixin, Base):
 class DispatchRecord(TimestampMixin, Base):
     __tablename__ = "dispatch_records"
     __table_args__ = (
-        UniqueConstraint("brand_id", "sku_id", "platform", "city", "dispatch_date", name="uq_dispatch_record_dedupe"),
+        UniqueConstraint("brand_id", "sku_id", "platform", "city", "dispatch_date", "import_batch_id", name="uq_dispatch_record_dedupe"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -265,7 +265,7 @@ class DispatchRecord(TimestampMixin, Base):
 class GRNRecord(TimestampMixin, Base):
     __tablename__ = "grn_records"
     __table_args__ = (
-        UniqueConstraint("brand_id", "sku_id", "platform", "city", "grn_date", name="uq_grn_record_dedupe"),
+        UniqueConstraint("brand_id", "sku_id", "platform", "city", "grn_date", "import_batch_id", name="uq_grn_record_dedupe"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
