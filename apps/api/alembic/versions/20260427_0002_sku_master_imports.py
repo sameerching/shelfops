@@ -34,6 +34,7 @@ def upgrade() -> None:
         sa.Column("is_hero_sku", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("active_flag", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["brand_id"], ["brands.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("brand_id", "sku_code", name="uq_skus_brand_id_sku_code"),
@@ -53,6 +54,7 @@ def upgrade() -> None:
         sa.Column("rejected_rows", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("duplicate_rows", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["brand_id"], ["brands.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )

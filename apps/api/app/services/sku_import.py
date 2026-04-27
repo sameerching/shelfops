@@ -40,7 +40,7 @@ def parse_sku_file(filename: str, data: bytes) -> pd.DataFrame:
 
 
 def _to_decimal(value: object, column_name: str) -> Decimal:
-    if value is None or (isinstance(value, float) and pd.isna(value)):
+    if value is None or pd.isna(value):
         raise ValueError(f"{column_name} is required")
     try:
         return Decimal(str(value))
@@ -49,7 +49,7 @@ def _to_decimal(value: object, column_name: str) -> Decimal:
 
 
 def _to_bool(value: object, default: bool) -> bool:
-    if value is None or (isinstance(value, float) and pd.isna(value)):
+    if value is None or pd.isna(value):
         return default
     if isinstance(value, bool):
         return value
@@ -59,6 +59,22 @@ def _to_bool(value: object, default: bool) -> bool:
     if text in FALSE_VALUES:
         return False
     raise ValueError("Invalid boolean value")
+
+
+def _required_text(value: object, column_name: str) -> str:
+    if value is None or pd.isna(value):
+        raise ValueError(f"{column_name} is required")
+    text = str(value).strip()
+    if not text:
+        raise ValueError(f"{column_name} is required")
+    return text
+
+
+def _optional_text(value: object) -> str | None:
+    if value is None or pd.isna(value):
+        return None
+    text = str(value).strip()
+    return text if text else None
 
 
 def import_sku_master(db: Session, brand_id: int, file_name: str, content: bytes) -> ImportSummaryResponse:
@@ -107,21 +123,14 @@ def import_sku_master(db: Session, brand_id: int, file_name: str, content: bytes
     accepted_rows = 0
     rejected_rows = 0
     duplicate_rows = 0
-    seen_keys: set[str] = set()
+    sku_cache: dict[str, SKU] = {}
 
     for row_idx, row in df.iterrows():
         row_number = int(row_idx) + 2
         try:
-            sku_code = str(row.get("sku_code", "")).strip()
-            sku_name = str(row.get("sku_name", "")).strip()
-            category = str(row.get("category", "")).strip()
-
-            if not sku_code:
-                raise ValueError("sku_code is required")
-            if not sku_name:
-                raise ValueError("sku_name is required")
-            if not category:
-                raise ValueError("category is required")
+            sku_code = _required_text(row.get("sku_code"), "sku_code")
+            sku_name = _required_text(row.get("sku_name"), "sku_name")
+            category = _required_text(row.get("category"), "category")
 
             selling_price = _to_decimal(row.get("selling_price"), "selling_price")
             contribution_margin = _to_decimal(row.get("contribution_margin"), "contribution_margin")
@@ -129,15 +138,14 @@ def import_sku_master(db: Session, brand_id: int, file_name: str, content: bytes
 
             mrp_value = row.get("mrp")
             mrp = None
-            if "mrp" in df.columns and not (mrp_value is None or (isinstance(mrp_value, float) and pd.isna(mrp_value))):
+            if "mrp" in df.columns and not (mrp_value is None or pd.isna(mrp_value)):
                 mrp = _to_decimal(mrp_value, "mrp")
 
-            key = f"{brand_id}:{sku_code}"
-            if key in seen_keys:
-                duplicate_rows += 1
-            seen_keys.add(key)
-
-            existing = db.scalar(select(SKU).where(SKU.brand_id == brand_id, SKU.sku_code == sku_code))
+            existing = sku_cache.get(sku_code)
+            if existing is None:
+                existing = db.scalar(select(SKU).where(SKU.brand_id == brand_id, SKU.sku_code == sku_code))
+                if existing is not None:
+                    sku_cache[sku_code] = existing
             if existing is not None:
                 duplicate_rows += 1
                 existing.sku_name = sku_name
@@ -145,7 +153,7 @@ def import_sku_master(db: Session, brand_id: int, file_name: str, content: bytes
                 existing.selling_price = selling_price
                 existing.contribution_margin = contribution_margin
                 existing.case_pack = case_pack
-                existing.brand = str(row.get("brand")).strip() if "brand" in df.columns and not pd.isna(row.get("brand")) else None
+                existing.brand = _optional_text(row.get("brand")) if "brand" in df.columns else None
                 existing.mrp = mrp
                 existing.is_hero_sku = _to_bool(row.get("is_hero_sku"), default=False)
                 existing.active_flag = _to_bool(row.get("active_flag"), default=True)
@@ -158,12 +166,13 @@ def import_sku_master(db: Session, brand_id: int, file_name: str, content: bytes
                     selling_price=selling_price,
                     contribution_margin=contribution_margin,
                     case_pack=case_pack,
-                    brand=str(row.get("brand")).strip() if "brand" in df.columns and not pd.isna(row.get("brand")) else None,
+                    brand=_optional_text(row.get("brand")) if "brand" in df.columns else None,
                     mrp=mrp,
                     is_hero_sku=_to_bool(row.get("is_hero_sku"), default=False),
                     active_flag=_to_bool(row.get("active_flag"), default=True),
                 )
                 db.add(sku)
+                sku_cache[sku_code] = sku
             accepted_rows += 1
         except ValueError as exc:
             rejected_rows += 1

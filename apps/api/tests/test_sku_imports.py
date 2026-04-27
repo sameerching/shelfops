@@ -109,6 +109,27 @@ def test_invalid_numeric_value_creates_row_error_and_continues() -> None:
     assert len(list_response.json()) == 1
 
 
+def test_blank_required_text_field_is_rejected() -> None:
+    seed_brand(6)
+    csv_data = (
+        "sku_code,sku_name,category,selling_price,contribution_margin,case_pack\n"
+        "SKU-1,,Snacks,10,0.2,6\n"
+        "SKU-2,Item 2,Snacks,12,0.25,6\n"
+    )
+
+    response = client.post(
+        "/imports/sku-master",
+        files={"file": ("sku_master.csv", csv_data, "text/csv")},
+        data={"brand_id": "6"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["accepted_rows"] == 1
+    assert payload["rejected_rows"] == 1
+    assert payload["errors"][0]["column_name"] == "sku_name"
+
+
 def test_duplicate_sku_code_in_same_upload_upserts() -> None:
     seed_brand(4)
     csv_data = (
