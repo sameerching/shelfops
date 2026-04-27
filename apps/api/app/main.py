@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.availability import router as availability_router
+from app.api.cases import router as cases_router
 from app.api.dispatch_records import router as dispatch_records_router
 from app.api.grn_records import router as grn_records_router
 from app.api.health import router as health_router
@@ -26,6 +27,7 @@ app.include_router(health_router)
 app.include_router(imports_router)
 app.include_router(skus_router)
 app.include_router(availability_router)
+app.include_router(cases_router)
 app.include_router(sales_velocity_router)
 app.include_router(inventory_router)
 app.include_router(po_records_router)

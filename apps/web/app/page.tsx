@@ -32,6 +32,9 @@ export default function Home() {
         <Link className="rounded border border-slate-300 px-4 py-2" href="/grn-records">
           GRN Records
         </Link>
+        <Link className="rounded border border-slate-300 px-4 py-2" href="/cases">
+          Cases
+        </Link>
       </div>
     </main>
   );
