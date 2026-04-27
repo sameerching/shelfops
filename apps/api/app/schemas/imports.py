@@ -37,3 +37,22 @@ class SKUResponse(BaseModel):
     active_flag: bool
     created_at: datetime
     updated_at: datetime
+
+
+class LocationSchema(BaseModel):
+    id: int
+    platform: str
+    city: str
+    location: str
+
+
+class AvailabilitySnapshotResponse(BaseModel):
+    id: int
+    brand_id: int
+    sku_id: int
+    sku_code: str
+    sku_name: str
+    status: str
+    timestamp: datetime
+    import_batch_id: int | None
+    location: LocationSchema
