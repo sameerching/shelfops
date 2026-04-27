@@ -137,6 +137,56 @@ def test_latest_in_stock_marks_case_recovered() -> None:
     assert case["recovered_at"] == "2026-04-01T12:00:00"
 
 
+def test_recovered_case_is_not_recreated_without_new_oos_incident() -> None:
+    seed_brand(109)
+    seed_skus(109, ["SKU-1"])
+    upload_availability(
+        109,
+        (
+            "sku_code,platform,city,location,status,timestamp\n"
+            "SKU-1,Blinkit,Mumbai,Andheri,oos,2026-04-01T10:00:00Z\n"
+            "SKU-1,Blinkit,Mumbai,Andheri,in_stock,2026-04-01T12:00:00Z\n"
+        ),
+    )
+
+    first = generate_cases(109)
+    second = generate_cases(109)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    second_payload = second.json()
+    assert second_payload["generated_cases"] == 0
+    cases = client.get("/cases", params={"brand_id": 109}).json()
+    assert len(cases) == 1
+    assert cases[0]["status"] == "recovered"
+
+
+def test_new_oos_incident_after_recovery_gets_fresh_detected_at() -> None:
+    seed_brand(110)
+    seed_skus(110, ["SKU-1"])
+    upload_availability(
+        110,
+        (
+            "sku_code,platform,city,location,status,timestamp\n"
+            "SKU-1,Blinkit,Mumbai,Andheri,oos,2026-04-01T10:00:00Z\n"
+            "SKU-1,Blinkit,Mumbai,Andheri,in_stock,2026-04-01T12:00:00Z\n"
+        ),
+    )
+    generate_cases(110)
+    upload_availability(
+        110,
+        "sku_code,platform,city,location,status,timestamp\nSKU-1,Blinkit,Mumbai,Andheri,oos,2026-04-02T09:00:00Z\n",
+    )
+
+    second_incident = generate_cases(110)
+
+    assert second_incident.status_code == 200
+    payload = second_incident.json()
+    assert payload["generated_cases"] == 1
+    active_case = next(row for row in payload["cases"] if row["status"] in {"detected", "active"})
+    assert active_case["detected_at"] == "2026-04-02T09:00:00"
+
+
 def test_lost_sales_and_margin_calculation_with_velocity_and_sku_values() -> None:
     seed_brand(103)
     seed_skus(103, ["SKU-1"], selling_price=Decimal("100"), margin=Decimal("30"))

@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy import Select, and_, func, select
+from sqlalchemy import Select, and_, func, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.models.entities import AvailabilitySnapshot, CaseUpdate, Location, SKU, SalesVelocity, StockoutCase
@@ -70,18 +70,6 @@ def generate_stockout_cases(db: Session, brand_id: int) -> tuple[int, int, int, 
     ).scalars().all()
     active_map = {(c.brand_id, c.sku_id, c.location_id): c for c in active_cases}
 
-    oos_groups = db.execute(
-        select(
-            AvailabilitySnapshot.brand_id,
-            AvailabilitySnapshot.sku_id,
-            AvailabilitySnapshot.location_id,
-            func.min(AvailabilitySnapshot.timestamp),
-            func.max(AvailabilitySnapshot.timestamp),
-        )
-        .where(AvailabilitySnapshot.brand_id == brand_id, AvailabilitySnapshot.status == "out_of_stock")
-        .group_by(AvailabilitySnapshot.brand_id, AvailabilitySnapshot.sku_id, AvailabilitySnapshot.location_id)
-    ).all()
-
     latest_subquery = (
         select(
             AvailabilitySnapshot.brand_id.label("brand_id"),
@@ -108,6 +96,50 @@ def generate_stockout_cases(db: Session, brand_id: int) -> tuple[int, int, int, 
         .where(AvailabilitySnapshot.brand_id == brand_id)
     ).scalars()
     latest_by_combo = {(r.brand_id, r.sku_id, r.location_id): r for r in latest_rows}
+    current_oos_combos = [combo for combo, row in latest_by_combo.items() if row.status == "out_of_stock"]
+
+    oos_groups: list[tuple[int, int, int, datetime, datetime]] = []
+    if current_oos_combos:
+        scoped_rows = db.execute(
+            select(
+                AvailabilitySnapshot.brand_id,
+                AvailabilitySnapshot.sku_id,
+                AvailabilitySnapshot.location_id,
+                AvailabilitySnapshot.status,
+                AvailabilitySnapshot.timestamp,
+            ).where(
+                AvailabilitySnapshot.brand_id == brand_id,
+                tuple_(
+                    AvailabilitySnapshot.brand_id,
+                    AvailabilitySnapshot.sku_id,
+                    AvailabilitySnapshot.location_id,
+                ).in_(current_oos_combos),
+            )
+        ).all()
+
+        last_in_stock_by_combo: dict[tuple[int, int, int], datetime] = {}
+        oos_timestamps_by_combo: dict[tuple[int, int, int], list[datetime]] = {}
+        for row_brand_id, row_sku_id, row_location_id, status, timestamp in scoped_rows:
+            combo = (row_brand_id, row_sku_id, row_location_id)
+            if status == "in_stock":
+                prior = last_in_stock_by_combo.get(combo)
+                if prior is None or timestamp > prior:
+                    last_in_stock_by_combo[combo] = timestamp
+                continue
+            if status != "out_of_stock":
+                continue
+            oos_timestamps_by_combo.setdefault(combo, []).append(timestamp)
+
+        for combo in current_oos_combos:
+            oos_timestamps = oos_timestamps_by_combo.get(combo, [])
+            if not oos_timestamps:
+                continue
+            last_in_stock = last_in_stock_by_combo.get(combo)
+            if last_in_stock is not None:
+                oos_timestamps = [ts for ts in oos_timestamps if ts > last_in_stock]
+            if not oos_timestamps:
+                continue
+            oos_groups.append((combo[0], combo[1], combo[2], min(oos_timestamps), max(oos_timestamps)))
 
     generated_cases = 0
     updated_cases = 0
