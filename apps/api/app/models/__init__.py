@@ -4,6 +4,7 @@ from app.models.entities import (
     ImportBatch,
     ImportRowError,
     Location,
+    SalesVelocity,
     SKU,
     UploadedFile,
     User,
@@ -18,4 +19,5 @@ __all__ = [
     "ImportRowError",
     "Location",
     "AvailabilitySnapshot",
+    "SalesVelocity",
 ]

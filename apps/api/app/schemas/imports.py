@@ -56,3 +56,17 @@ class AvailabilitySnapshotResponse(BaseModel):
     timestamp: datetime
     import_batch_id: int | None
     location: LocationSchema
+
+
+class SalesVelocityResponse(BaseModel):
+    id: int
+    brand_id: int
+    sku_id: int
+    sku_code: str
+    sku_name: str
+    platform: str
+    city: str
+    avg_units_per_day: Decimal
+    import_batch_id: int | None
+    created_at: datetime
+    updated_at: datetime

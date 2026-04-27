@@ -72,11 +72,14 @@ export default function UploadsPage() {
   const [brandId, setBrandId] = useState("1");
   const [skuFile, setSkuFile] = useState<File | null>(null);
   const [availabilityFile, setAvailabilityFile] = useState<File | null>(null);
+  const [salesVelocityFile, setSalesVelocityFile] = useState<File | null>(null);
   const [skuSummary, setSkuSummary] = useState<ImportSummary | null>(null);
   const [availabilitySummary, setAvailabilitySummary] = useState<ImportSummary | null>(null);
+  const [salesVelocitySummary, setSalesVelocitySummary] = useState<ImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingSku, setLoadingSku] = useState(false);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [loadingSalesVelocity, setLoadingSalesVelocity] = useState(false);
 
   const upload = async (endpoint: string, file: File): Promise<ImportSummary> => {
     const formData = new FormData();
@@ -131,13 +134,35 @@ export default function UploadsPage() {
     }
   };
 
+  const onSalesVelocitySubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!salesVelocityFile) {
+      setError("Please select a Sales Velocity CSV/XLSX file.");
+      return;
+    }
+    setError(null);
+    setLoadingSalesVelocity(true);
+    try {
+      const data = await upload("/imports/sales-velocity", salesVelocityFile);
+      setSalesVelocitySummary(data);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
+    } finally {
+      setLoadingSalesVelocity(false);
+    }
+  };
+
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-10">
       <h1 className="text-3xl font-semibold">Uploads</h1>
       <p className="text-sm text-slate-600">
-        Upload SKU master and availability reports. View imported availability snapshots on the{" "}
+        Upload SKU master, availability, and sales velocity reports. View imported availability snapshots on the{" "}
         <Link className="underline" href="/availability">
           Availability page
+        </Link>
+        {" "}and sales velocity rows on the{" "}
+        <Link className="underline" href="/sales-velocity">
+          Sales Velocity page
         </Link>
         .
       </p>
@@ -152,7 +177,7 @@ export default function UploadsPage() {
         />
       </label>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <form onSubmit={onSkuSubmit} className="space-y-4 rounded border border-slate-200 p-4">
           <h2 className="text-lg font-semibold">SKU Master Upload</h2>
           <input
@@ -184,12 +209,31 @@ export default function UploadsPage() {
             {loadingAvailability ? "Uploading..." : "Upload Availability"}
           </button>
         </form>
+
+        <form onSubmit={onSalesVelocitySubmit} className="space-y-4 rounded border border-slate-200 p-4">
+          <h2 className="text-lg font-semibold">Sales Velocity Upload</h2>
+          <input
+            className="w-full rounded border border-slate-300 px-3 py-2"
+            type="file"
+            accept=".csv,.xlsx"
+            onChange={(e) => setSalesVelocityFile(e.target.files?.[0] ?? null)}
+            required
+          />
+          <button
+            disabled={loadingSalesVelocity}
+            className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
+            type="submit"
+          >
+            {loadingSalesVelocity ? "Uploading..." : "Upload Sales Velocity"}
+          </button>
+        </form>
       </div>
 
       {error && <p className="rounded border border-red-200 bg-red-50 p-3 text-red-700">{error}</p>}
 
       <SummaryCard title="SKU Master Import" summary={skuSummary} />
       <SummaryCard title="Availability Import" summary={availabilitySummary} />
+      <SummaryCard title="Sales Velocity Import" summary={salesVelocitySummary} />
     </main>
   );
 }

@@ -20,6 +20,7 @@ class Brand(TimestampMixin, Base):
     skus: Mapped[list["SKU"]] = relationship(back_populates="brand_rel")
     import_batches: Mapped[list["ImportBatch"]] = relationship(back_populates="brand")
     availability_snapshots: Mapped[list["AvailabilitySnapshot"]] = relationship(back_populates="brand")
+    sales_velocity_rows: Mapped[list["SalesVelocity"]] = relationship(back_populates="brand")
 
 
 class User(TimestampMixin, Base):
@@ -68,6 +69,7 @@ class SKU(TimestampMixin, Base):
 
     brand_rel: Mapped[Brand] = relationship(back_populates="skus")
     availability_snapshots: Mapped[list["AvailabilitySnapshot"]] = relationship(back_populates="sku")
+    sales_velocity_rows: Mapped[list["SalesVelocity"]] = relationship(back_populates="sku")
 
 
 class ImportBatch(TimestampMixin, Base):
@@ -86,6 +88,7 @@ class ImportBatch(TimestampMixin, Base):
     brand: Mapped[Brand] = relationship(back_populates="import_batches")
     row_errors: Mapped[list["ImportRowError"]] = relationship(back_populates="import_batch", cascade="all, delete-orphan")
     availability_snapshots: Mapped[list["AvailabilitySnapshot"]] = relationship(back_populates="import_batch")
+    sales_velocity_rows: Mapped[list["SalesVelocity"]] = relationship(back_populates="import_batch")
 
 
 class ImportRowError(Base):
@@ -142,3 +145,30 @@ class AvailabilitySnapshot(TimestampMixin, Base):
     sku: Mapped[SKU] = relationship(back_populates="availability_snapshots")
     location_rel: Mapped[Location] = relationship(back_populates="availability_snapshots")
     import_batch: Mapped[ImportBatch] = relationship(back_populates="availability_snapshots")
+
+
+class SalesVelocity(TimestampMixin, Base):
+    __tablename__ = "sales_velocity"
+    __table_args__ = (
+        UniqueConstraint(
+            "brand_id",
+            "sku_id",
+            "platform",
+            "city",
+            name="uq_sales_velocity_brand_sku_platform_city",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
+    sku_id: Mapped[int] = mapped_column(ForeignKey("skus.id", ondelete="CASCADE"), nullable=False, index=True)
+    platform: Mapped[str] = mapped_column(String(100), nullable=False)
+    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    avg_units_per_day: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    import_batch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    brand: Mapped[Brand] = relationship(back_populates="sales_velocity_rows")
+    sku: Mapped[SKU] = relationship(back_populates="sales_velocity_rows")
+    import_batch: Mapped[ImportBatch] = relationship(back_populates="sales_velocity_rows")
