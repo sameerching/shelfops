@@ -135,6 +135,7 @@ def test_latest_in_stock_marks_case_recovered() -> None:
     case = response.json()["cases"][0]
     assert case["status"] == "recovered"
     assert case["recovered_at"] == "2026-04-01T12:00:00"
+    assert case["stockout_duration_hours"] == "2.0000"
 
 
 def test_recovered_case_is_not_recreated_without_new_oos_incident() -> None:
@@ -218,6 +219,36 @@ def test_instock_then_oos_between_runs_closes_and_reopens_case() -> None:
     assert recovered_case["detected_at"] == "2026-04-01T10:00:00"
     assert recovered_case["recovered_at"] == "2026-04-01T12:00:00"
     assert active_case["detected_at"] == "2026-04-01T14:00:00"
+
+
+def test_backfilled_oos_updates_existing_open_case_without_duplicate() -> None:
+    seed_brand(112)
+    seed_skus(112, ["SKU-1"])
+    upload_availability(
+        112,
+        (
+            "sku_code,platform,city,location,status,timestamp\n"
+            "SKU-1,Blinkit,Mumbai,Andheri,oos,2026-04-01T10:00:00Z\n"
+            "SKU-1,Blinkit,Mumbai,Andheri,oos,2026-04-01T12:00:00Z\n"
+        ),
+    )
+    first_generation = generate_cases(112)
+    assert first_generation.status_code == 200
+    assert len(client.get("/cases", params={"brand_id": 112}).json()) == 1
+
+    upload_availability(
+        112,
+        "sku_code,platform,city,location,status,timestamp\nSKU-1,Blinkit,Mumbai,Andheri,oos,2026-04-01T08:00:00Z\n",
+    )
+    second_generation = generate_cases(112)
+
+    assert second_generation.status_code == 200
+    payload = second_generation.json()
+    assert payload["generated_cases"] == 0
+    all_cases = client.get("/cases", params={"brand_id": 112}).json()
+    assert len(all_cases) == 1
+    assert all_cases[0]["detected_at"] == "2026-04-01T08:00:00"
+    assert all_cases[0]["stockout_duration_hours"] == "4.0000"
 
 
 def test_lost_sales_and_margin_calculation_with_velocity_and_sku_values() -> None:

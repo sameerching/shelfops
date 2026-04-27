@@ -139,10 +139,22 @@ def generate_stockout_cases(db: Session, brand_id: int) -> tuple[int, int, int, 
 
         cases_for_combo = existing_by_combo.get(combo, [])
         case_by_detected = {existing_case.detected_at: existing_case for existing_case in cases_for_combo}
+        unmatched_case_ids: set[int] = {existing_case.id for existing_case in cases_for_combo}
+        active_unmatched_cases: list[StockoutCase] = [
+            existing_case
+            for existing_case in cases_for_combo
+            if existing_case.id in unmatched_case_ids and existing_case.recovered_at is None
+        ]
 
         for first_oos, last_oos, recovered_at in incidents:
             case = case_by_detected.get(first_oos)
-            duration_hours = _hours_between(first_oos, last_oos)
+            if case is None and len(active_unmatched_cases) == 1:
+                # Backfilled out_of_stock snapshots can shift incident start earlier than the currently open case.
+                # In that situation, update the existing open case instead of creating a duplicate.
+                case = active_unmatched_cases[0]
+
+            duration_end = recovered_at if recovered_at is not None else last_oos
+            duration_hours = _hours_between(first_oos, duration_end)
             lost_sales, lost_margin, priority = _calculate_estimates(duration_hours=duration_hours, velocity=velocity, sku=sku)
             incident_status = "recovered" if recovered_at is not None else "detected"
 
@@ -173,8 +185,13 @@ def generate_stockout_cases(db: Session, brand_id: int) -> tuple[int, int, int, 
                 generated_cases += 1
                 continue
 
+            unmatched_case_ids.discard(case.id)
+            active_unmatched_cases = [existing_case for existing_case in active_unmatched_cases if existing_case.id != case.id]
             old_status = case.status
             has_changed = False
+            if case.detected_at != first_oos:
+                case.detected_at = first_oos
+                has_changed = True
             if case.last_seen_oos_at != last_oos:
                 case.last_seen_oos_at = last_oos
                 has_changed = True
