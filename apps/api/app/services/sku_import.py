@@ -29,9 +29,9 @@ FALSE_VALUES = {"0", "false", "f", "no", "n"}
 def parse_sku_file(filename: str, data: bytes) -> pd.DataFrame:
     lowered = filename.lower()
     if lowered.endswith(".csv"):
-        df = pd.read_csv(BytesIO(data))
+        df = pd.read_csv(BytesIO(data), dtype=str)
     elif lowered.endswith(".xlsx"):
-        df = pd.read_excel(BytesIO(data), engine="openpyxl")
+        df = pd.read_excel(BytesIO(data), engine="openpyxl", dtype=str)
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only CSV and XLSX are supported")
 
@@ -135,6 +135,9 @@ def import_sku_master(db: Session, brand_id: int, file_name: str, content: bytes
             selling_price = _to_decimal(row.get("selling_price"), "selling_price")
             contribution_margin = _to_decimal(row.get("contribution_margin"), "contribution_margin")
             case_pack = _to_decimal(row.get("case_pack"), "case_pack")
+            brand = _optional_text(row.get("brand")) if "brand" in df.columns else None
+            is_hero_sku = _to_bool(row.get("is_hero_sku"), default=False)
+            active_flag = _to_bool(row.get("active_flag"), default=True)
 
             mrp_value = row.get("mrp")
             mrp = None
@@ -153,10 +156,10 @@ def import_sku_master(db: Session, brand_id: int, file_name: str, content: bytes
                 existing.selling_price = selling_price
                 existing.contribution_margin = contribution_margin
                 existing.case_pack = case_pack
-                existing.brand = _optional_text(row.get("brand")) if "brand" in df.columns else None
+                existing.brand = brand
                 existing.mrp = mrp
-                existing.is_hero_sku = _to_bool(row.get("is_hero_sku"), default=False)
-                existing.active_flag = _to_bool(row.get("active_flag"), default=True)
+                existing.is_hero_sku = is_hero_sku
+                existing.active_flag = active_flag
             else:
                 sku = SKU(
                     brand_id=brand_id,
@@ -166,10 +169,10 @@ def import_sku_master(db: Session, brand_id: int, file_name: str, content: bytes
                     selling_price=selling_price,
                     contribution_margin=contribution_margin,
                     case_pack=case_pack,
-                    brand=_optional_text(row.get("brand")) if "brand" in df.columns else None,
+                    brand=brand,
                     mrp=mrp,
-                    is_hero_sku=_to_bool(row.get("is_hero_sku"), default=False),
-                    active_flag=_to_bool(row.get("active_flag"), default=True),
+                    is_hero_sku=is_hero_sku,
+                    active_flag=active_flag,
                 )
                 db.add(sku)
                 sku_cache[sku_code] = sku

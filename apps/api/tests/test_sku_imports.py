@@ -155,6 +155,65 @@ def test_duplicate_sku_code_in_same_upload_upserts() -> None:
     assert rows[0]["sku_name"] == "Item 1 Updated"
 
 
+def test_numeric_sku_code_preserves_leading_zeroes() -> None:
+    seed_brand(7)
+    csv_data = (
+        "sku_code,sku_name,category,selling_price,contribution_margin,case_pack\n"
+        "00123,Item 123,Snacks,10,0.2,6\n"
+    )
+
+    response = client.post(
+        "/imports/sku-master",
+        files={"file": ("sku_master.csv", csv_data, "text/csv")},
+        data={"brand_id": "7"},
+    )
+
+    assert response.status_code == 200
+    list_response = client.get("/skus", params={"brand_id": 7})
+    assert list_response.status_code == 200
+    rows = list_response.json()
+    assert len(rows) == 1
+    assert rows[0]["sku_code"] == "00123"
+
+
+def test_invalid_boolean_does_not_mutate_existing_duplicate() -> None:
+    seed_brand(8)
+    initial_csv = (
+        "sku_code,sku_name,category,selling_price,contribution_margin,case_pack,is_hero_sku\n"
+        "SKU-1,Original Name,Snacks,10,0.2,6,false\n"
+    )
+    update_csv = (
+        "sku_code,sku_name,category,selling_price,contribution_margin,case_pack,is_hero_sku\n"
+        "SKU-1,Mutated Name,Snacks,15,0.3,6,not-a-bool\n"
+    )
+
+    initial_response = client.post(
+        "/imports/sku-master",
+        files={"file": ("sku_master.csv", initial_csv, "text/csv")},
+        data={"brand_id": "8"},
+    )
+    assert initial_response.status_code == 200
+    assert initial_response.json()["rejected_rows"] == 0
+
+    update_response = client.post(
+        "/imports/sku-master",
+        files={"file": ("sku_master.csv", update_csv, "text/csv")},
+        data={"brand_id": "8"},
+    )
+    assert update_response.status_code == 200
+    update_payload = update_response.json()
+    assert update_payload["accepted_rows"] == 0
+    assert update_payload["rejected_rows"] == 1
+
+    list_response = client.get("/skus", params={"brand_id": 8})
+    assert list_response.status_code == 200
+    rows = list_response.json()
+    assert len(rows) == 1
+    assert rows[0]["sku_name"] == "Original Name"
+    assert rows[0]["selling_price"] == "10"
+    assert rows[0]["is_hero_sku"] is False
+
+
 def test_get_skus_returns_uploaded_skus() -> None:
     seed_brand(5)
     data = pd.DataFrame(
