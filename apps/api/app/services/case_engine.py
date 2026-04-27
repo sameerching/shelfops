@@ -1,13 +1,11 @@
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy import Select, and_, func, select, tuple_
+from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from app.models.entities import AvailabilitySnapshot, CaseUpdate, Location, SKU, SalesVelocity, StockoutCase
 from app.schemas.cases import StockoutCaseResponse
-
-ACTIVE_CASE_STATUSES = {"detected", "active"}
 
 
 def _hours_between(start: datetime, end: datetime) -> Decimal:
@@ -65,89 +63,66 @@ def _to_response(case: StockoutCase, sku: SKU, location: Location) -> StockoutCa
 
 
 def generate_stockout_cases(db: Session, brand_id: int) -> tuple[int, int, int, list[StockoutCase]]:
-    active_cases = db.execute(
-        select(StockoutCase).where(StockoutCase.brand_id == brand_id, StockoutCase.status.in_(ACTIVE_CASE_STATUSES))
-    ).scalars().all()
-    active_map = {(c.brand_id, c.sku_id, c.location_id): c for c in active_cases}
+    existing_cases = db.execute(select(StockoutCase).where(StockoutCase.brand_id == brand_id)).scalars().all()
+    existing_by_combo: dict[tuple[int, int, int], list[StockoutCase]] = {}
+    for existing_case in existing_cases:
+        combo_key = (existing_case.brand_id, existing_case.sku_id, existing_case.location_id)
+        existing_by_combo.setdefault(combo_key, []).append(existing_case)
+    for combo_cases in existing_by_combo.values():
+        combo_cases.sort(key=lambda row: (row.detected_at, row.id))
 
-    latest_subquery = (
+    snapshot_rows = db.execute(
         select(
-            AvailabilitySnapshot.brand_id.label("brand_id"),
-            AvailabilitySnapshot.sku_id.label("sku_id"),
-            AvailabilitySnapshot.location_id.label("location_id"),
-            func.max(AvailabilitySnapshot.timestamp).label("latest_timestamp"),
+            AvailabilitySnapshot.brand_id,
+            AvailabilitySnapshot.sku_id,
+            AvailabilitySnapshot.location_id,
+            AvailabilitySnapshot.status,
+            AvailabilitySnapshot.timestamp,
         )
         .where(AvailabilitySnapshot.brand_id == brand_id)
-        .group_by(AvailabilitySnapshot.brand_id, AvailabilitySnapshot.sku_id, AvailabilitySnapshot.location_id)
-        .subquery()
-    )
-
-    latest_rows = db.execute(
-        select(AvailabilitySnapshot)
-        .join(
-            latest_subquery,
-            and_(
-                AvailabilitySnapshot.brand_id == latest_subquery.c.brand_id,
-                AvailabilitySnapshot.sku_id == latest_subquery.c.sku_id,
-                AvailabilitySnapshot.location_id == latest_subquery.c.location_id,
-                AvailabilitySnapshot.timestamp == latest_subquery.c.latest_timestamp,
-            ),
+        .order_by(
+            AvailabilitySnapshot.brand_id,
+            AvailabilitySnapshot.sku_id,
+            AvailabilitySnapshot.location_id,
+            AvailabilitySnapshot.timestamp,
+            AvailabilitySnapshot.id,
         )
-        .where(AvailabilitySnapshot.brand_id == brand_id)
-    ).scalars()
-    latest_by_combo = {(r.brand_id, r.sku_id, r.location_id): r for r in latest_rows}
-    current_oos_combos = [combo for combo, row in latest_by_combo.items() if row.status == "out_of_stock"]
+    ).all()
 
-    oos_groups: list[tuple[int, int, int, datetime, datetime]] = []
-    if current_oos_combos:
-        scoped_rows = db.execute(
-            select(
-                AvailabilitySnapshot.brand_id,
-                AvailabilitySnapshot.sku_id,
-                AvailabilitySnapshot.location_id,
-                AvailabilitySnapshot.status,
-                AvailabilitySnapshot.timestamp,
-            ).where(
-                AvailabilitySnapshot.brand_id == brand_id,
-                tuple_(
-                    AvailabilitySnapshot.brand_id,
-                    AvailabilitySnapshot.sku_id,
-                    AvailabilitySnapshot.location_id,
-                ).in_(current_oos_combos),
-            )
-        ).all()
+    snapshots_by_combo: dict[tuple[int, int, int], list[tuple[str, datetime]]] = {}
+    for row_brand_id, row_sku_id, row_location_id, status, timestamp in snapshot_rows:
+        combo = (row_brand_id, row_sku_id, row_location_id)
+        snapshots_by_combo.setdefault(combo, []).append((status, timestamp))
 
-        last_in_stock_by_combo: dict[tuple[int, int, int], datetime] = {}
-        oos_timestamps_by_combo: dict[tuple[int, int, int], list[datetime]] = {}
-        for row_brand_id, row_sku_id, row_location_id, status, timestamp in scoped_rows:
-            combo = (row_brand_id, row_sku_id, row_location_id)
-            if status == "in_stock":
-                prior = last_in_stock_by_combo.get(combo)
-                if prior is None or timestamp > prior:
-                    last_in_stock_by_combo[combo] = timestamp
-                continue
-            if status != "out_of_stock":
-                continue
-            oos_timestamps_by_combo.setdefault(combo, []).append(timestamp)
+    incident_by_combo: dict[tuple[int, int, int], list[tuple[datetime, datetime, datetime | None]]] = {}
+    for combo, timeline in snapshots_by_combo.items():
+        incidents: list[tuple[datetime, datetime, datetime | None]] = []
+        open_start: datetime | None = None
+        last_oos: datetime | None = None
 
-        for combo in current_oos_combos:
-            oos_timestamps = oos_timestamps_by_combo.get(combo, [])
-            if not oos_timestamps:
+        for status, timestamp in timeline:
+            if status == "out_of_stock":
+                if open_start is None:
+                    open_start = timestamp
+                last_oos = timestamp
                 continue
-            last_in_stock = last_in_stock_by_combo.get(combo)
-            if last_in_stock is not None:
-                oos_timestamps = [ts for ts in oos_timestamps if ts > last_in_stock]
-            if not oos_timestamps:
-                continue
-            oos_groups.append((combo[0], combo[1], combo[2], min(oos_timestamps), max(oos_timestamps)))
+            if status == "in_stock" and open_start is not None and last_oos is not None:
+                incidents.append((open_start, last_oos, timestamp))
+                open_start = None
+                last_oos = None
+
+        if open_start is not None and last_oos is not None:
+            incidents.append((open_start, last_oos, None))
+
+        if incidents:
+            incident_by_combo[combo] = incidents
 
     generated_cases = 0
     updated_cases = 0
     recovered_cases = 0
 
-    for group_brand_id, sku_id, location_id, first_oos, last_oos in oos_groups:
-        combo = (group_brand_id, sku_id, location_id)
-        case = active_map.get(combo)
+    for combo, incidents in incident_by_combo.items():
+        group_brand_id, sku_id, location_id = combo
         sku = db.get(SKU, sku_id)
         location = db.get(Location, location_id)
         if sku is None or location is None:
@@ -162,76 +137,79 @@ def generate_stockout_cases(db: Session, brand_id: int) -> tuple[int, int, int, 
             )
         ).scalar_one_or_none()
 
-        if case is None:
+        cases_for_combo = existing_by_combo.get(combo, [])
+        case_by_detected = {existing_case.detected_at: existing_case for existing_case in cases_for_combo}
+
+        for first_oos, last_oos, recovered_at in incidents:
+            case = case_by_detected.get(first_oos)
             duration_hours = _hours_between(first_oos, last_oos)
             lost_sales, lost_margin, priority = _calculate_estimates(duration_hours=duration_hours, velocity=velocity, sku=sku)
-            case = StockoutCase(
-                brand_id=group_brand_id,
-                sku_id=sku_id,
-                location_id=location_id,
-                detected_at=first_oos,
-                last_seen_oos_at=last_oos,
-                recovered_at=None,
-                stockout_duration_hours=duration_hours,
-                estimated_lost_sales=lost_sales,
-                estimated_lost_margin=lost_margin,
-                priority=priority,
-                status="detected",
-            )
-            db.add(case)
-            db.flush()
-            db.add(
-                CaseUpdate(
-                    case_id=case.id,
-                    update_text="Case detected from out_of_stock availability snapshots",
-                    old_status=None,
-                    new_status="detected",
-                )
-            )
-            active_map[combo] = case
-            generated_cases += 1
-            continue
+            incident_status = "recovered" if recovered_at is not None else "detected"
 
-        prior_last_seen = case.last_seen_oos_at
-        case.last_seen_oos_at = max(case.last_seen_oos_at, last_oos)
-        duration_hours = _hours_between(case.detected_at, case.last_seen_oos_at)
-        lost_sales, lost_margin, priority = _calculate_estimates(duration_hours=duration_hours, velocity=velocity, sku=sku)
-        case.stockout_duration_hours = duration_hours
-        case.estimated_lost_sales = lost_sales
-        case.estimated_lost_margin = lost_margin
-        case.priority = priority
-        old_status = case.status
-        case.status = "active"
-        case.recovered_at = None
-        if prior_last_seen != case.last_seen_oos_at or old_status != case.status:
-            db.add(
-                CaseUpdate(
-                    case_id=case.id,
-                    update_text="Case updated with latest out_of_stock signal",
-                    old_status=old_status,
-                    new_status=case.status,
+            if case is None:
+                case = StockoutCase(
+                    brand_id=group_brand_id,
+                    sku_id=sku_id,
+                    location_id=location_id,
+                    detected_at=first_oos,
+                    last_seen_oos_at=last_oos,
+                    recovered_at=recovered_at,
+                    stockout_duration_hours=duration_hours,
+                    estimated_lost_sales=lost_sales,
+                    estimated_lost_margin=lost_margin,
+                    priority=priority,
+                    status=incident_status,
                 )
-            )
-            updated_cases += 1
+                db.add(case)
+                db.flush()
+                db.add(
+                    CaseUpdate(
+                        case_id=case.id,
+                        update_text="Case detected from out_of_stock availability snapshots",
+                        old_status=None,
+                        new_status=incident_status,
+                    )
+                )
+                generated_cases += 1
+                continue
 
-    for combo, case in active_map.items():
-        latest_snapshot = latest_by_combo.get(combo)
-        if latest_snapshot is None:
-            continue
-        if latest_snapshot.status != "in_stock":
-            continue
-        old_status = case.status
-        case.status = "recovered"
-        case.recovered_at = latest_snapshot.timestamp
-        db.add(
-            CaseUpdate(
-                case_id=case.id,
-                update_text="Case marked recovered from latest in_stock signal",
-                old_status=old_status,
-                new_status="recovered",
-            )
-        )
-        recovered_cases += 1
+            old_status = case.status
+            has_changed = False
+            if case.last_seen_oos_at != last_oos:
+                case.last_seen_oos_at = last_oos
+                has_changed = True
+            if case.stockout_duration_hours != duration_hours:
+                case.stockout_duration_hours = duration_hours
+                has_changed = True
+            if case.estimated_lost_sales != lost_sales:
+                case.estimated_lost_sales = lost_sales
+                has_changed = True
+            if case.estimated_lost_margin != lost_margin:
+                case.estimated_lost_margin = lost_margin
+                has_changed = True
+            if case.priority != priority:
+                case.priority = priority
+                has_changed = True
+            if case.recovered_at != recovered_at:
+                case.recovered_at = recovered_at
+                has_changed = True
+            if case.status != incident_status:
+                case.status = incident_status
+                has_changed = True
+
+            if has_changed:
+                db.add(
+                    CaseUpdate(
+                        case_id=case.id,
+                        update_text="Case updated from availability status transitions",
+                        old_status=old_status,
+                        new_status=case.status,
+                    )
+                )
+                if old_status != "recovered" and case.status == "recovered":
+                    recovered_cases += 1
+                else:
+                    updated_cases += 1
 
     db.commit()
 

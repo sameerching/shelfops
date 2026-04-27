@@ -187,6 +187,39 @@ def test_new_oos_incident_after_recovery_gets_fresh_detected_at() -> None:
     assert active_case["detected_at"] == "2026-04-02T09:00:00"
 
 
+def test_instock_then_oos_between_runs_closes_and_reopens_case() -> None:
+    seed_brand(111)
+    seed_skus(111, ["SKU-1"])
+    upload_availability(
+        111,
+        "sku_code,platform,city,location,status,timestamp\nSKU-1,Blinkit,Mumbai,Andheri,oos,2026-04-01T10:00:00Z\n",
+    )
+    first_generation = generate_cases(111)
+    assert first_generation.status_code == 200
+
+    upload_availability(
+        111,
+        (
+            "sku_code,platform,city,location,status,timestamp\n"
+            "SKU-1,Blinkit,Mumbai,Andheri,in_stock,2026-04-01T12:00:00Z\n"
+            "SKU-1,Blinkit,Mumbai,Andheri,oos,2026-04-01T14:00:00Z\n"
+        ),
+    )
+    second_generation = generate_cases(111)
+
+    assert second_generation.status_code == 200
+    payload = second_generation.json()
+    assert payload["generated_cases"] == 1
+    assert payload["recovered_cases"] == 1
+    all_cases = client.get("/cases", params={"brand_id": 111}).json()
+    assert len(all_cases) == 2
+    recovered_case = next(row for row in all_cases if row["status"] == "recovered")
+    active_case = next(row for row in all_cases if row["status"] in {"detected", "active"})
+    assert recovered_case["detected_at"] == "2026-04-01T10:00:00"
+    assert recovered_case["recovered_at"] == "2026-04-01T12:00:00"
+    assert active_case["detected_at"] == "2026-04-01T14:00:00"
+
+
 def test_lost_sales_and_margin_calculation_with_velocity_and_sku_values() -> None:
     seed_brand(103)
     seed_skus(103, ["SKU-1"], selling_price=Decimal("100"), margin=Decimal("30"))
