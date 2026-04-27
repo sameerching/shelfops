@@ -70,3 +70,18 @@ class SalesVelocityResponse(BaseModel):
     import_batch_id: int | None
     created_at: datetime
     updated_at: datetime
+
+
+class InventoryPositionResponse(BaseModel):
+    id: int
+    brand_id: int
+    sku_id: int
+    sku_code: str
+    sku_name: str
+    warehouse: str
+    city: str
+    available_qty: Decimal
+    timestamp: datetime
+    import_batch_id: int | None
+    created_at: datetime
+    updated_at: datetime

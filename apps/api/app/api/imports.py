@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db_session
 from app.schemas.imports import ImportSummaryResponse
 from app.services.availability_import import import_availability_report
+from app.services.inventory_import import import_inventory_report
 from app.services.sales_velocity_import import import_sales_velocity_report
 from app.services.sku_import import import_sku_master
 
@@ -52,3 +53,20 @@ async def upload_sales_velocity(
 
     content = await file.read()
     return import_sales_velocity_report(db=db, brand_id=brand_id, file_name=file.filename or "upload.csv", content=content)
+
+
+@router.post("/inventory", response_model=ImportSummaryResponse)
+async def upload_inventory(
+    file: UploadFile = File(...),
+    brand_id_form: int | None = Form(default=None, alias="brand_id"),
+    brand_id_query: int | None = Query(default=None, alias="brand_id"),
+    db: Session = Depends(get_db_session),
+) -> ImportSummaryResponse:
+    brand_id = brand_id_form if brand_id_form is not None else brand_id_query
+    if brand_id is None:
+        from fastapi import HTTPException, status
+
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="brand_id is required")
+
+    content = await file.read()
+    return import_inventory_report(db=db, brand_id=brand_id, file_name=file.filename or "upload.csv", content=content)
