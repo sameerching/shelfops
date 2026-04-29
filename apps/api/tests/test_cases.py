@@ -114,6 +114,7 @@ def test_multiple_oos_snapshots_update_same_case() -> None:
     list_response = client.get("/cases", params={"brand_id": 101})
     cases = list_response.json()
     assert len(cases) == 1
+    assert cases[0]["status"] == "active"
     assert cases[0]["stockout_duration_hours"] == "6.0000"
 
 

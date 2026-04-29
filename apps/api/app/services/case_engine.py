@@ -156,7 +156,12 @@ def generate_stockout_cases(db: Session, brand_id: int) -> tuple[int, int, int, 
             duration_end = recovered_at if recovered_at is not None else last_oos
             duration_hours = _hours_between(first_oos, duration_end)
             lost_sales, lost_margin, priority = _calculate_estimates(duration_hours=duration_hours, velocity=velocity, sku=sku)
-            incident_status = "recovered" if recovered_at is not None else "detected"
+            if recovered_at is not None:
+                incident_status = "recovered"
+            elif case is None:
+                incident_status = "detected"
+            else:
+                incident_status = "active"
 
             if case is None:
                 case = StockoutCase(
