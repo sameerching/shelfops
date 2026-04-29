@@ -1,6 +1,7 @@
 from app.models.entities import (
     AvailabilitySnapshot,
     Brand,
+    CaseUpdate,
     DispatchRecord,
     GRNRecord,
     ImportBatch,
@@ -10,6 +11,7 @@ from app.models.entities import (
     PORecord,
     SalesVelocity,
     SKU,
+    StockoutCase,
     UploadedFile,
     User,
 )
@@ -28,4 +30,6 @@ __all__ = [
     "PORecord",
     "DispatchRecord",
     "GRNRecord",
+    "StockoutCase",
+    "CaseUpdate",
 ]

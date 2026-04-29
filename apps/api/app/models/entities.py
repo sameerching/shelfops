@@ -25,6 +25,7 @@ class Brand(TimestampMixin, Base):
     po_records: Mapped[list["PORecord"]] = relationship(back_populates="brand")
     dispatch_records: Mapped[list["DispatchRecord"]] = relationship(back_populates="brand")
     grn_records: Mapped[list["GRNRecord"]] = relationship(back_populates="brand")
+    stockout_cases: Mapped[list["StockoutCase"]] = relationship(back_populates="brand")
 
 
 class User(TimestampMixin, Base):
@@ -78,6 +79,7 @@ class SKU(TimestampMixin, Base):
     po_records: Mapped[list["PORecord"]] = relationship(back_populates="sku")
     dispatch_records: Mapped[list["DispatchRecord"]] = relationship(back_populates="sku")
     grn_records: Mapped[list["GRNRecord"]] = relationship(back_populates="sku")
+    stockout_cases: Mapped[list["StockoutCase"]] = relationship(back_populates="sku")
 
 
 class ImportBatch(TimestampMixin, Base):
@@ -129,6 +131,7 @@ class Location(TimestampMixin, Base):
     location: Mapped[str] = mapped_column(String(255), nullable=False)
 
     availability_snapshots: Mapped[list["AvailabilitySnapshot"]] = relationship(back_populates="location_rel")
+    stockout_cases: Mapped[list["StockoutCase"]] = relationship(back_populates="location_rel")
 
 
 class AvailabilitySnapshot(TimestampMixin, Base):
@@ -286,3 +289,38 @@ class GRNRecord(TimestampMixin, Base):
     brand: Mapped[Brand] = relationship(back_populates="grn_records")
     sku: Mapped[SKU] = relationship(back_populates="grn_records")
     import_batch: Mapped[ImportBatch] = relationship(back_populates="grn_records")
+
+
+class StockoutCase(TimestampMixin, Base):
+    __tablename__ = "stockout_cases"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
+    sku_id: Mapped[int] = mapped_column(ForeignKey("skus.id", ondelete="CASCADE"), nullable=False, index=True)
+    location_id: Mapped[int] = mapped_column(ForeignKey("locations.id", ondelete="CASCADE"), nullable=False, index=True)
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    last_seen_oos_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    recovered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    stockout_duration_hours: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False, default=0, server_default="0")
+    estimated_lost_sales: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0, server_default="0")
+    estimated_lost_margin: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0, server_default="0")
+    priority: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+
+    brand: Mapped[Brand] = relationship(back_populates="stockout_cases")
+    sku: Mapped[SKU] = relationship(back_populates="stockout_cases")
+    location_rel: Mapped[Location] = relationship(back_populates="stockout_cases")
+    case_updates: Mapped[list["CaseUpdate"]] = relationship(back_populates="case", cascade="all, delete-orphan")
+
+
+class CaseUpdate(Base):
+    __tablename__ = "case_updates"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("stockout_cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    update_text: Mapped[str] = mapped_column(Text(), nullable=False)
+    old_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    new_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
+
+    case: Mapped[StockoutCase] = relationship(back_populates="case_updates")
